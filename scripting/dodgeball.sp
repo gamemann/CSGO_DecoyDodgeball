@@ -4,6 +4,7 @@
 #include <cstrike>
 
 #define MAXENTITIES 2048
+#define PL_VERSION "1.4"
 
 /*
 Versions:
@@ -53,9 +54,9 @@ Versions:
 public Plugin:myinfo = {
 	name = "Decoy Dodgeball",
 	description = "A Decoy Dodgeball plugin for Counter-Strike: Global Offensive.",
-	author = "[GFL] Roy (Christian Deacon)",
-	version = "1.4",
-	url = "GFLClan.com"
+	author = "Roy (Christian Deacon)",
+	version = PL_VERSION,
+	url = "GFLClan.com & Alliedmods.net & TheDevelopingCommunity.com"
 };
 
 // ConVars
@@ -112,8 +113,8 @@ public OnPluginStart() {
 	// Convars
 	g_hGiveTime = CreateConVar("sm_db_give_time", "1.0", "The delay on giving decoys after being thrown.");
 	g_hPrint = CreateConVar("sm_db_equip_notify", "0", "Whether to print to chat or not when a client spawns with a dodgeball.");
-	g_hRemovetimer = CreateConVar("sm_db_remove_timer", "30.0", "Every X seconds, it will remove all decoys on the map (already does this on player_death, but this is just for saftey).");
-	g_hBounces = CreateConVar("sm_db_bounces", "1", "Amount of bounces the decoy can have (off a surface), before destorying. This is ineffective if random mode is on.");
+	g_hRemovetimer = CreateConVar("sm_db_remove_timer", "30.0", "Every X seconds, it will remove all decoys on the map (already does this on player_death, but this is just for safety).");
+	g_hBounces = CreateConVar("sm_db_bounces", "1", "Amount of bounces the decoy can have (off a surface), before destroying. This is ineffective if random mode is on.");
 	g_hRandom = CreateConVar("sm_db_random", "0", "If enabled, a random number depending on \"sm_db_random_max\" and \"sm_db_random_min\" will be used for the amount of bounces a decoy (dodgeball) can have. (1 = Mode 1, 2 = Mode 2, 3 = Mode 3 0 = Off). More information about the modes at GFLClan.com.");
 	g_hRandomMax = CreateConVar("sm_db_random_max", "3", "The maximum amount of bounces the decoy (dodgeball) can have using random mode.");
 	g_hRandomMin = CreateConVar("sm_db_random_min", "1", "The minimum amount of bounces the decoy (dodgeball) can have using random mode.");
@@ -124,6 +125,9 @@ public OnPluginStart() {
 	g_hDebug = CreateConVar("sm_db_debug", "0", "Enables debugging for dodgeball (will spam the SourceMod logs if enabled).");
 	g_hCustomHitReg = CreateConVar("sm_db_custom_hit_detection", "0", "This lets the plugin decide the dodgeball hit detection. This will force the victim to suicide after being hit by a dodgeball, therefore, there will be no kills awarded to the attacker. This *may* provide better dodgeball hit detection.");
 	g_hMinigamesMode = CreateConVar("sm_db_minigames", "0", "Enables the Minigames mode. More information about this at GFLClan.com.");
+	
+	// AlliedMods Release
+	CreateConVar("sm_db_version", PL_VERSION, "CS:GO Decoy Dodgeball plugin version");
 	
 	// FindConVars
 	g_hfGravity = FindConVar("sv_gravity");
