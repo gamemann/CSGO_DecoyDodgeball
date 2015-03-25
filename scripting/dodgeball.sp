@@ -45,6 +45,8 @@ Versions:
 	- Advertisements/Notifications now begin with [DB] instead of [GFL].
 	- "sm_db_equip_notify" is now off by default.
 	- Plugin-side functions are now "stock" instead of "public".
+1.4:
+	- Cleaned up code.
 	
 */
 
@@ -52,31 +54,31 @@ public Plugin:myinfo = {
 	name = "Decoy Dodgeball",
 	description = "A Decoy Dodgeball plugin for Counter-Strike: Global Offensive.",
 	author = "[GFL] Roy (Christian Deacon)",
-	version = "1.3",
+	version = "1.4",
 	url = "GFLClan.com"
 };
 
 // ConVars
-new Handle:g_givetime = INVALID_HANDLE;
-new Handle:g_print = INVALID_HANDLE;
-new Handle:g_removetimer = INVALID_HANDLE;
-new Handle:g_bounces = INVALID_HANDLE;
-new Handle:g_random = INVALID_HANDLE;
-new Handle:g_randomMax = INVALID_HANDLE;
-new Handle:g_randomMin = INVALID_HANDLE;
-new Handle:g_roundstartad = INVALID_HANDLE;
-new Handle:g_clienthealth = INVALID_HANDLE;
-new Handle:g_clientarmor = INVALID_HANDLE;
-new Handle:g_dbdamage = INVALID_HANDLE;
-new Handle:g_debug = INVALID_HANDLE;
-new Handle:g_customhitreg = INVALID_HANDLE;
-new Handle:g_minigames = INVALID_HANDLE;
+new Handle:g_hGiveTime = INVALID_HANDLE;
+new Handle:g_hPrint = INVALID_HANDLE;
+new Handle:g_hRemovetimer = INVALID_HANDLE;
+new Handle:g_hBounces = INVALID_HANDLE;
+new Handle:g_hRandom = INVALID_HANDLE;
+new Handle:g_hRandomMax = INVALID_HANDLE;
+new Handle:g_hRandomMin = INVALID_HANDLE;
+new Handle:g_hRoundStartAdvert = INVALID_HANDLE;
+new Handle:g_hClientHealth = INVALID_HANDLE;
+new Handle:g_hClientArmor = INVALID_HANDLE;
+new Handle:g_hDBDamage = INVALID_HANDLE;
+new Handle:g_hDebug = INVALID_HANDLE;
+new Handle:g_hCustomHitReg = INVALID_HANDLE;
+new Handle:g_hMinigamesMode = INVALID_HANDLE;
 
 // FindConVars
-new Handle:f_gravity;
-new Handle:f_friction;
-new Handle:f_timescale;
-new Handle:f_accelerate;
+new Handle:g_hfGravity;
+new Handle:g_hfFriction;
+new Handle:g_hfTimeScale;
+new Handle:g_hfAccelerate;
 
 // ConVar Values
 new Float:fGiveTime;
@@ -98,8 +100,7 @@ new bool:bMinigames;
 new iBounceCount[MAXENTITIES+1];
 new iBouncesRand;	
 new iBouncesRandClient[MAXPLAYERS+1];
-new String:recc2[MAX_NAME_LENGTH];
-
+new String:sRECC2[MAX_NAME_LENGTH];
 
 public OnPluginStart() {
 	// Hook the player spawn event.
@@ -109,42 +110,42 @@ public OnPluginStart() {
 	HookEvent("round_end", Event_RoundEnd);
 	
 	// Convars
-	g_givetime = CreateConVar("sm_db_give_time", "1.0", "The delay on giving decoys after being thrown.");
-	g_print = CreateConVar("sm_db_equip_notify", "0", "Whether to print to chat or not when a client spawns with a dodgeball.");
-	g_removetimer = CreateConVar("sm_db_remove_timer", "30.0", "Every X seconds, it will remove all decoys on the map (already does this on player_death, but this is just for saftey).");
-	g_bounces = CreateConVar("sm_db_bounces", "1", "Amount of bounces the decoy can have (off a surface), before destorying. This is ineffective if random mode is on.");
-	g_random = CreateConVar("sm_db_random", "0", "If enabled, a random number depending on \"sm_db_random_max\" and \"sm_db_random_min\" will be used for the amount of bounces a decoy (dodgeball) can have. (1 = Mode 1, 2 = Mode 2, 3 = Mode 3 0 = Off). More information about the modes at GFLClan.com.");
-	g_randomMax = CreateConVar("sm_db_random_max", "3", "The maximum amount of bounces the decoy (dodgeball) can have using random mode.");
-	g_randomMin = CreateConVar("sm_db_random_min", "1", "The minimum amount of bounces the decoy (dodgeball) can have using random mode.");
-	g_roundstartad = CreateConVar("sm_db_rs_advert", "1", "Enables the Round Start advertisement.");
-	g_clienthealth = CreateConVar("sm_db_client_health", "1", "Set the health to this number on client spawn.");
-	g_clientarmor = CreateConVar("sm_db_client_armor", "0", "Set the armor to this number on client spawn.");
-	g_dbdamage = CreateConVar("sm_db_damage", "200.0", "The amount of damage the decoys (dodgeballs) do.");
-	g_debug = CreateConVar("sm_db_debug", "0", "Enables debugging for dodgeball (will spam the SourceMod logs if enabled).");
-	g_customhitreg = CreateConVar("sm_db_custom_hit_detection", "0", "This lets the plugin decide the dodgeball hit detection. This will force the victim to suicide after being hit by a dodgeball, therefore, there will be no kills awarded to the attacker. This *may* provide better dodgeball hit detection.");
-	g_minigames = CreateConVar("sm_db_minigames", "0", "Enables the Minigames mode. More information about this at GFLClan.com.");
+	g_hGiveTime = CreateConVar("sm_db_give_time", "1.0", "The delay on giving decoys after being thrown.");
+	g_hPrint = CreateConVar("sm_db_equip_notify", "0", "Whether to print to chat or not when a client spawns with a dodgeball.");
+	g_hRemovetimer = CreateConVar("sm_db_remove_timer", "30.0", "Every X seconds, it will remove all decoys on the map (already does this on player_death, but this is just for saftey).");
+	g_hBounces = CreateConVar("sm_db_bounces", "1", "Amount of bounces the decoy can have (off a surface), before destorying. This is ineffective if random mode is on.");
+	g_hRandom = CreateConVar("sm_db_random", "0", "If enabled, a random number depending on \"sm_db_random_max\" and \"sm_db_random_min\" will be used for the amount of bounces a decoy (dodgeball) can have. (1 = Mode 1, 2 = Mode 2, 3 = Mode 3 0 = Off). More information about the modes at GFLClan.com.");
+	g_hRandomMax = CreateConVar("sm_db_random_max", "3", "The maximum amount of bounces the decoy (dodgeball) can have using random mode.");
+	g_hRandomMin = CreateConVar("sm_db_random_min", "1", "The minimum amount of bounces the decoy (dodgeball) can have using random mode.");
+	g_hRoundStartAdvert = CreateConVar("sm_db_rs_advert", "1", "Enables the Round Start advertisement.");
+	g_hClientHealth = CreateConVar("sm_db_client_health", "1", "Set the health to this number on client spawn.");
+	g_hClientArmor = CreateConVar("sm_db_client_armor", "0", "Set the armor to this number on client spawn.");
+	g_hDBDamage = CreateConVar("sm_db_damage", "200.0", "The amount of damage the decoys (dodgeballs) do.");
+	g_hDebug = CreateConVar("sm_db_debug", "0", "Enables debugging for dodgeball (will spam the SourceMod logs if enabled).");
+	g_hCustomHitReg = CreateConVar("sm_db_custom_hit_detection", "0", "This lets the plugin decide the dodgeball hit detection. This will force the victim to suicide after being hit by a dodgeball, therefore, there will be no kills awarded to the attacker. This *may* provide better dodgeball hit detection.");
+	g_hMinigamesMode = CreateConVar("sm_db_minigames", "0", "Enables the Minigames mode. More information about this at GFLClan.com.");
 	
 	// FindConVars
-	f_gravity = FindConVar("sv_gravity");
-	f_friction = FindConVar("sv_friction");
-	f_timescale = FindConVar("host_timescale");
-	f_accelerate = FindConVar("sv_accelerate");
+	g_hfGravity = FindConVar("sv_gravity");
+	g_hfFriction = FindConVar("sv_friction");
+	g_hfTimeScale = FindConVar("host_timescale");
+	g_hfAccelerate = FindConVar("sv_accelerate");
 	
 	// Hook ConVar Changes
-	HookConVarChange(g_givetime, CVarChanged);
-	HookConVarChange(g_print, CVarChanged);
-	HookConVarChange(g_removetimer, CVarChanged);
-	HookConVarChange(g_bounces, CVarChanged);
-	HookConVarChange(g_random, CVarChanged);
-	HookConVarChange(g_randomMax, CVarChanged);
-	HookConVarChange(g_randomMin, CVarChanged);
-	HookConVarChange(g_roundstartad, CVarChanged);
-	HookConVarChange(g_clienthealth, CVarChanged);
-	HookConVarChange(g_clientarmor, CVarChanged);
-	HookConVarChange(g_dbdamage, CVarChanged);
-	HookConVarChange(g_debug, CVarChanged);
-	HookConVarChange(g_customhitreg, CVarChanged);
-	HookConVarChange(g_minigames, CVarChanged);
+	HookConVarChange(g_hGiveTime, CVarChanged);
+	HookConVarChange(g_hPrint, CVarChanged);
+	HookConVarChange(g_hRemovetimer, CVarChanged);
+	HookConVarChange(g_hBounces, CVarChanged);
+	HookConVarChange(g_hRandom, CVarChanged);
+	HookConVarChange(g_hRandomMax, CVarChanged);
+	HookConVarChange(g_hRandomMin, CVarChanged);
+	HookConVarChange(g_hRoundStartAdvert, CVarChanged);
+	HookConVarChange(g_hClientHealth, CVarChanged);
+	HookConVarChange(g_hClientArmor, CVarChanged);
+	HookConVarChange(g_hDBDamage, CVarChanged);
+	HookConVarChange(g_hDebug, CVarChanged);
+	HookConVarChange(g_hCustomHitReg, CVarChanged);
+	HookConVarChange(g_hMinigamesMode, CVarChanged);
 	
 	// Auto execute the config!
 	AutoExecConfig(true, "sm_dodgeball");
@@ -163,28 +164,28 @@ public CVarChanged(Handle:convar, const String:oldv[], const String:newv[]) {
 
 public OnConfigsExecuted() {
 	// Set all the convars!
-	fGiveTime = GetConVarFloat(g_givetime);
-	bPrint = GetConVarBool(g_print);
-	fRemoveTimer = GetConVarFloat(g_removetimer);
-	iBounces = GetConVarInt(g_bounces);
-	iRandom = GetConVarInt(g_random);
-	iRandomMax = GetConVarInt(g_randomMax);
-	iRandomMin = GetConVarInt(g_randomMin);
-	bRoundStartAd = GetConVarBool(g_roundstartad);
-	iClientHealth = GetConVarInt(g_clienthealth);
-	iClientArmor = GetConVarInt(g_clientarmor);
-	fDBDamage = GetConVarFloat(g_dbdamage);
-	bDebug = GetConVarBool(g_debug);
-	bCustomHitReg = GetConVarBool(g_customhitreg);
-	bMinigames = GetConVarBool(g_minigames);
+	fGiveTime = GetConVarFloat(g_hGiveTime);
+	bPrint = GetConVarBool(g_hPrint);
+	fRemoveTimer = GetConVarFloat(g_hRemovetimer);
+	iBounces = GetConVarInt(g_hBounces);
+	iRandom = GetConVarInt(g_hRandom);
+	iRandomMax = GetConVarInt(g_hRandomMax);
+	iRandomMin = GetConVarInt(g_hRandomMin);
+	bRoundStartAd = GetConVarBool(g_hRoundStartAdvert);
+	iClientHealth = GetConVarInt(g_hClientHealth);
+	iClientArmor = GetConVarInt(g_hClientArmor);
+	fDBDamage = GetConVarFloat(g_hDBDamage);
+	bDebug = GetConVarBool(g_hDebug);
+	bCustomHitReg = GetConVarBool(g_hCustomHitReg);
+	bMinigames = GetConVarBool(g_hMinigamesMode);
 	
 	if (bMinigames) {
 		// Set the flags of the FindConVars.
-		SetConVarFlags(f_gravity, GetConVarFlags(f_gravity)&~FCVAR_NOTIFY);
-		SetConVarFlags(f_friction, GetConVarFlags(f_friction)&~FCVAR_NOTIFY);
-		SetConVarFlags(f_timescale, (GetConVarFlags(f_timescale) & ~(FCVAR_NOTIFY|FCVAR_CHEAT)));
-		SetConVarFlags(f_timescale, GetConVarFlags(f_timescale)&FCVAR_REPLICATED);
-		SetConVarFlags(f_accelerate, GetConVarFlags(f_accelerate)&~FCVAR_NOTIFY);
+		SetConVarFlags(g_hfGravity, GetConVarFlags(g_hfGravity)&~FCVAR_NOTIFY);
+		SetConVarFlags(g_hfFriction, GetConVarFlags(g_hfFriction)&~FCVAR_NOTIFY);
+		SetConVarFlags(g_hfTimeScale, (GetConVarFlags(g_hfTimeScale) & ~(FCVAR_NOTIFY|FCVAR_CHEAT)));
+		SetConVarFlags(g_hfTimeScale, GetConVarFlags(g_hfTimeScale)&FCVAR_REPLICATED);
+		SetConVarFlags(g_hfAccelerate, GetConVarFlags(g_hfAccelerate)&~FCVAR_NOTIFY);
 	}
 	
 	CreateTimer(fRemoveTimer, Timer_RemoveDecoys, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
@@ -192,15 +193,7 @@ public OnConfigsExecuted() {
 
 public Action:Timer_RemoveDecoys(Handle:timer, any:data)
 {
-	new iMaxEnts = GetMaxEntities();
-	decl String:sClassName[64];
-	for(new i=MaxClients;i<iMaxEnts;i++)
-	{
-		if(IsValidEntity(i) && IsValidEdict(i) && GetEdictClassname(i, sClassName, sizeof(sClassName)) && StrEqual(sClassName, "weapon_decoy") && GetEntPropEnt(i, Prop_Send, "m_hOwnerEntity") == -1) {
-			//RemoveEdict(i);
-			AcceptEntityInput(i, "kill");	// Safer solution to remove items?
-		}
-	}
+	RemoveDecoys();
 }
 
 public OnClientPutInServer(client) {
@@ -268,17 +261,8 @@ public Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast) 
 	}
 }
 
-public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast) { 
-	// Now let's remove decoys right after player death.
-	new iMaxEnts = GetMaxEntities();
-	decl String:sClassName[64];
-	for(new i=MaxClients;i<iMaxEnts;i++)
-	{
-		if(IsValidEntity(i) && IsValidEdict(i) && GetEdictClassname(i, sClassName, sizeof(sClassName)) && StrEqual(sClassName, "weapon_decoy") && GetEntPropEnt(i, Prop_Send, "m_hOwnerEntity") == -1) {
-			//RemoveEdict(i);
-			AcceptEntityInput(i, "kill");	// Safer solution to remove items?
-		}
-	}
+public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast) {
+	RemoveDecoys();
 }
 
 public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast) {
@@ -300,40 +284,40 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast) {
 	}
 	
 	if (bMinigames) {
-		// Minigames mode is enabled.
+		// Minigames mode is enabled. Honestly, this is my first time working with Key Values in SourcePawn.
 		new Handle:kv = CreateKeyValues("Minigames");
 		decl String:filepath[255];
 		BuildPath(Path_SM, filepath, sizeof(filepath), "configs/dodgeball_minigames.cfg");
 		FileToKeyValues(kv, filepath);
 		
 		// To get the random minigame.
-		new MaxMinigames = 0;
-		new Minigame = 1;
-		new blocksize =  ByteCountToCells(PLATFORM_MAX_PATH);
-		new Handle:MinigameNames = CreateArray(blocksize);
+		new iMaxMinigames = 0;
+		new iMinigame = 1;
+		new iBlockSize =  ByteCountToCells(PLATFORM_MAX_PATH);
+		new Handle:hMinigameNames = CreateArray(iBlockSize);
 		
 		// Factors for each minigame.
-		new Float:gravity, Float:friction, Float:timescale, Float:accelerate, String:rscc[MAX_NAME_LENGTH], String:recc[MAX_NAME_LENGTH], String:kname[MAX_NAME_LENGTH], announce, idefault;
+		new Float:fGravity, Float:fFriction, Float:fTimeScale, Float:fAccelerate, String:sRSCC[MAX_NAME_LENGTH], String:sRECC[MAX_NAME_LENGTH], String:skName[MAX_NAME_LENGTH], iAnnounce, iDefault;
 		
 		if (KvGotoFirstSubKey(kv)) {
 			do {
-				MaxMinigames++;
+				iMaxMinigames++;
 				decl String:buffer[255];
 				KvGetSectionName(kv, buffer, sizeof(buffer));
-				PushArrayString(MinigameNames, buffer);
+				PushArrayString(hMinigameNames, buffer);
 				
 			} while (KvGotoNextKey(kv));		
 			KvRewind(kv);
 			KvGotoFirstSubKey(kv)
 			
 			// Now pick a random minigame.
-			Minigame = GetRandomInt(1, MaxMinigames);
+			iMinigame = GetRandomInt(1, iMaxMinigames);
 			if (bDebug) {
-				LogMessage("[DB Debug]Minigames: 1-%i", MaxMinigames);
+				LogMessage("[DB Debug]Minigames: 1-%i", iMaxMinigames);
 			}
 			
 			new String:keyname[255];
-			GetArrayString(MinigameNames, Minigame - 1, keyname, sizeof(keyname));
+			GetArrayString(hMinigameNames, iMinigame - 1, keyname, sizeof(keyname));
 			
 			decl String:buffer[255];
 			do {
@@ -345,54 +329,53 @@ public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast) {
 					if (bDebug) {
 						LogMessage("[DB Debug]\"%s\" minigame selected...", buffer);
 					}
-					KvGetString(kv, "name", kname, sizeof(kname));
-					gravity = KvGetFloat(kv, "gravity");
-					friction = KvGetFloat(kv, "friction");
-					timescale = KvGetFloat(kv, "timescale");
-					accelerate = KvGetFloat(kv, "accelerate");
-					announce = KvGetNum(kv, "announce");
-					idefault = KvGetNum(kv, "default");
-					KvGetString(kv, "rscc", rscc, sizeof(rscc));
-					KvGetString(kv, "recc", recc, sizeof(recc));
+					KvGetString(kv, "name", skName, sizeof(skName));
+					fGravity = KvGetFloat(kv, "gravity");
+					fFriction = KvGetFloat(kv, "friction");
+					fTimeScale = KvGetFloat(kv, "timescale");
+					fAccelerate = KvGetFloat(kv, "accelerate");
+					iAnnounce = KvGetNum(kv, "announce");
+					iDefault = KvGetNum(kv, "default");
+					KvGetString(kv, "rscc", sRSCC, sizeof(sRSCC));
+					KvGetString(kv, "recc", sRECC, sizeof(sRECC));
 				}
 			} while (KvGotoNextKey(kv));
 			// Now let's setup the game!
 			if (!StrEqual(name, "")) {
-				SetConVarFloat(f_gravity, gravity);
-				SetConVarFloat(f_friction, friction);
-				if (idefault || timescale == 1.0) {
-					SetTimeScale(timescale, true);
+				SetConVarFloat(g_hfGravity, fGravity);
+				SetConVarFloat(g_hfFriction, fFriction);
+				if (iDefault || fTimeScale == 1.0) {
+					SetTimeScale(fTimeScale, true);
 				} else {
-					SetTimeScale(timescale, false);
+					SetTimeScale(fTimeScale, false);
 				}
-				SetConVarFloat(f_accelerate, accelerate);
-				if (!StrEqual(rscc, "")) {
-					ServerCommand("exec %s", rscc);
+				SetConVarFloat(g_hfAccelerate, fAccelerate);
+				if (!StrEqual(sRSCC, "")) {
+					ServerCommand("exec %s", sRSCC);
 				}
-				if (announce) {
-					PrintToChatAll("\x02[DB]\x03 Special Minigame \"\x02%s\x03\" is being played!", kname);
+				if (iAnnounce) {
+					PrintToChatAll("\x02[DB]\x03 Special Minigame \"\x02%s\x03\" is being played!", skName);
 				}
 				
 				// Do the round end custom config
-				strcopy(recc2, sizeof(recc2), recc);
+				strcopy(sRECC2, sizeof(sRECC2), sRECC);
 			}
 		}
-		
 		CloseHandle(kv);
-		CloseHandle(MinigameNames);
+		CloseHandle(hMinigameNames);
 	}
 }
 
 public Event_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast) {
 	// Set all the factors back to default if Minigames is enabled.
 	if (bMinigames) {
-		SetConVarFloat(f_gravity, 800.0);
-		SetConVarFloat(f_friction, 5.2);
-		SetConVarFloat(f_accelerate, 5.5);
+		SetConVarFloat(g_hfGravity, 800.0);
+		SetConVarFloat(g_hfFriction, 5.2);
+		SetConVarFloat(g_hfAccelerate, 5.5);
 		SetTimeScale(1.0, true);
 		
-		if (!StrEqual(recc2, "")) {
-			ServerCommand("exec %s", recc2);
+		if (!StrEqual(sRECC2, "")) {
+			ServerCommand("exec %s", sRECC2);
 		}
 	}
 }
@@ -410,7 +393,7 @@ public OnEntitySpawned(entity) {
 	// Remove all player weapons.
 	RemoveClientWeapons(client);
 	
-	// Give the client a decoy on the next frame (safe)!
+	// Give the client a decoy on the next frame.
 	RequestFrame(GiveDecoy2, client);
 }
 
@@ -424,7 +407,7 @@ public OnEntityTouch(entity, tentity) {
 		return;
 	}
 	
-	if (0 < tentity < MaxClients) {	// I guess I could do if (0 > tentity > MaxClients) { // Kill code } but meh...
+	if (0 < tentity < MaxClients) {
 		// This is a player.
 		// Let's do the custom hits.
 		if(GetClientTeam(tentity) != GetClientTeam(owner) && GetClientTeam(tentity) > 1 && bCustomHitReg) {
@@ -560,7 +543,7 @@ stock GiveDodgeball(client) {
 }
 
 stock SetTimeScale(Float:ts, bool:reset) {
-	SetConVarFloat(f_timescale, ts);
+	SetConVarFloat(g_hfTimeScale, ts);
 	
 	if (reset) {
 		UpdateClientCheats(0);
@@ -593,6 +576,16 @@ stock RemoveClientWeapons(client) {
 		if (ent != -1) {
 			RemovePlayerItem(client, ent);
 			RemoveEdict(ent);
+		}
+	}
+}
+
+stock RemoveDecoys() {
+	decl String:sClassName[64];
+	for(new i = MaxClients; i< GetMaxEntities(); i++)
+	{
+		if(IsValidEntity(i) && IsValidEdict(i) && GetEdictClassname(i, sClassName, sizeof(sClassName)) && StrEqual(sClassName, "weapon_decoy") && GetEntPropEnt(i, Prop_Send, "m_hOwnerEntity") == -1) {
+			AcceptEntityInput(i, "kill");
 		}
 	}
 }
