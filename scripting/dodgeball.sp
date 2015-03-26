@@ -4,7 +4,7 @@
 #include <cstrike>
 
 #define MAXENTITIES 2048
-#define PL_VERSION "1.5"
+#define PL_VERSION "1.4"
 
 /*
 Versions:
@@ -48,14 +48,11 @@ Versions:
 	- Plugin-side functions are now "stock" instead of "public".
 1.4:
 	- Cleaned up code.
-1.5:
-	- Organized Code
-	- Renamed a few PrintToChat() strings.
-	- Added a ConVar: sm_db_automode - If 1, if the HP/Armor ConVar is changed, all current alive players will be set to the new values.
+	
 */
 
 public Plugin:myinfo = {
-	name = "[CS:GO] Decoy Dodgeball",
+	name = "Decoy Dodgeball",
 	description = "A Decoy Dodgeball plugin for Counter-Strike: Global Offensive.",
 	author = "Roy (Christian Deacon)",
 	version = PL_VERSION,
@@ -77,50 +74,48 @@ new Handle:g_hDBDamage = INVALID_HANDLE;
 new Handle:g_hDebug = INVALID_HANDLE;
 new Handle:g_hCustomHitReg = INVALID_HANDLE;
 new Handle:g_hMinigamesMode = INVALID_HANDLE;
-new Handle:g_hAutoMode = INVALID_HANDLE;
 
 // FindConVars
-new Handle:g_hGravity;
-new Handle:g_hFriction;
-new Handle:g_hTimeScale;
-new Handle:g_hAccelerate;
+new Handle:g_hfGravity;
+new Handle:g_hfFriction;
+new Handle:g_hfTimeScale;
+new Handle:g_hfAccelerate;
 
 // ConVar Values
-new Float:g_fGiveTime;
-new bool:g_bPrint;
-new Float:g_fRemoveTimer;
-new g_iBounces;
-new g_iRandom;
-new g_iRandomMax;
-new g_iRandomMin;
-new bool:g_bRoundStartAd;
-new g_iClientHealth;
-new g_iClientArmor;
-new Float:g_fDBDamage;
-new bool:g_bDebug;
-new bool:g_bCustomHitReg;
-new bool:g_bMinigames;
-new bool:g_bAutoMode;
+new Float:fGiveTime;
+new bool:bPrint;
+new Float:fRemoveTimer;
+new iBounces;
+new iRandom;
+new iRandomMax;
+new iRandomMin;
+new bool:bRoundStartAd;
+new iClientHealth;
+new iClientArmor;
+new Float:fDBDamage;
+new bool:bDebug;
+new bool:bCustomHitReg;
+new bool:bMinigames;
 
 // Other Values
-new g_iBounceCount[MAXENTITIES+1];
-new g_iBouncesRand;	
-new g_iBouncesRandClient[MAXPLAYERS+1];
-new String:g_sRECC2[MAX_NAME_LENGTH];
+new iBounceCount[MAXENTITIES+1];
+new iBouncesRand;	
+new iBouncesRandClient[MAXPLAYERS+1];
+new String:sRECC2[MAX_NAME_LENGTH];
 
 public OnPluginStart() {
-	// Events.
+	// Hook the player spawn event.
 	HookEvent("player_spawn", Event_PlayerSpawn);
 	HookEvent("player_death", Event_PlayerDeath);
 	HookEvent("round_start", Event_RoundStart);
 	HookEvent("round_end", Event_RoundEnd);
 	
-	// Convars.
+	// Convars
 	g_hGiveTime = CreateConVar("sm_db_give_time", "1.0", "The delay on giving decoys after being thrown.");
 	g_hPrint = CreateConVar("sm_db_equip_notify", "0", "Whether to print to chat or not when a client spawns with a dodgeball.");
 	g_hRemovetimer = CreateConVar("sm_db_remove_timer", "30.0", "Every X seconds, it will remove all decoys on the map (already does this on player_death, but this is just for safety).");
 	g_hBounces = CreateConVar("sm_db_bounces", "1", "Amount of bounces the decoy can have (off a surface), before destroying. This is ineffective if random mode is on.");
-	g_hRandom = CreateConVar("sm_db_random", "0", "If enabled, a random number depending on \"sm_db_random_max\" and \"sm_db_random_min\" will be used for the amount of bounces a decoy (dodgeball) can have. (1 = Mode 1, 2 = Mode 2, 3 = Mode 3 0 = Off). More information about the modes on the AlliedMods thread.");
+	g_hRandom = CreateConVar("sm_db_random", "0", "If enabled, a random number depending on \"sm_db_random_max\" and \"sm_db_random_min\" will be used for the amount of bounces a decoy (dodgeball) can have. (1 = Mode 1, 2 = Mode 2, 3 = Mode 3 0 = Off). More information about the modes at GFLClan.com.");
 	g_hRandomMax = CreateConVar("sm_db_random_max", "3", "The maximum amount of bounces the decoy (dodgeball) can have using random mode.");
 	g_hRandomMin = CreateConVar("sm_db_random_min", "1", "The minimum amount of bounces the decoy (dodgeball) can have using random mode.");
 	g_hRoundStartAdvert = CreateConVar("sm_db_rs_advert", "1", "Enables the Round Start advertisement.");
@@ -129,17 +124,16 @@ public OnPluginStart() {
 	g_hDBDamage = CreateConVar("sm_db_damage", "200.0", "The amount of damage the decoys (dodgeballs) do.");
 	g_hDebug = CreateConVar("sm_db_debug", "0", "Enables debugging for dodgeball (will spam the SourceMod logs if enabled).");
 	g_hCustomHitReg = CreateConVar("sm_db_custom_hit_detection", "0", "This lets the plugin decide the dodgeball hit detection. This will force the victim to suicide after being hit by a dodgeball, therefore, there will be no kills awarded to the attacker. This *may* provide better dodgeball hit detection.");
-	g_hMinigamesMode = CreateConVar("sm_db_minigames", "0", "Enables the Minigames mode. More information about this on the AlliedMods thread.");
-	g_hAutoMode = CreateConVar("sm_db_automode", "1", "If 1, if the HP/Armor ConVar is changed, all current alive players will be set to the values.");
+	g_hMinigamesMode = CreateConVar("sm_db_minigames", "0", "Enables the Minigames mode. More information about this at GFLClan.com.");
 	
-	// AlliedMods Release.
-	CreateConVar("sm_db_version", PL_VERSION, "The current version of CS:GO Decoy Dodgeball.");
+	// AlliedMods Release
+	CreateConVar("sm_db_version", PL_VERSION, "CS:GO Decoy Dodgeball plugin version");
 	
 	// FindConVars
-	g_hGravity = FindConVar("sv_gravity");
-	g_hFriction = FindConVar("sv_friction");
-	g_hTimeScale = FindConVar("host_timescale");
-	g_hAccelerate = FindConVar("sv_accelerate");
+	g_hfGravity = FindConVar("sv_gravity");
+	g_hfFriction = FindConVar("sv_friction");
+	g_hfTimeScale = FindConVar("host_timescale");
+	g_hfAccelerate = FindConVar("sv_accelerate");
 	
 	// Hook ConVar Changes
 	HookConVarChange(g_hGiveTime, CVarChanged);
@@ -156,7 +150,6 @@ public OnPluginStart() {
 	HookConVarChange(g_hDebug, CVarChanged);
 	HookConVarChange(g_hCustomHitReg, CVarChanged);
 	HookConVarChange(g_hMinigamesMode, CVarChanged);
-	HookConVarChange(g_hAutoMode, CVarChanged);
 	
 	// Auto execute the config!
 	AutoExecConfig(true, "sm_dodgeball");
@@ -169,55 +162,37 @@ public OnPluginStart() {
 	}
 }
 
-public CVarChanged(Handle:hCvar, const String:sOldv[], const String:sNewv[]) {
+public CVarChanged(Handle:convar, const String:oldv[], const String:newv[]) {
 	OnConfigsExecuted();
-	
-	// Auto-Mode
-	if (g_bAutoMode) {
-		if (hCvar == g_hClientHealth) {
-			for (new i = 1; i <= MaxClients; i++) {
-				if (IsClientInGame(i) && IsPlayerAlive(i)) {
-					SetEntityHealth(i, StringToInt(sNewv));
-				}
-			}
-		} else if (hCvar == g_hClientArmor) {
-			for (new i = 1; i <= MaxClients; i++) {
-				if (IsClientInGame(i) && IsPlayerAlive(i)) {
-					SetEntProp(i, Prop_Send, "m_ArmorValue", StringToInt(sNewv));
-				}
-			}
-		}
-	}
 }
 
 public OnConfigsExecuted() {
 	// Set all the convars!
-	g_fGiveTime = GetConVarFloat(g_hGiveTime);
-	g_bPrint = GetConVarBool(g_hPrint);
-	g_fRemoveTimer = GetConVarFloat(g_hRemovetimer);
-	g_iBounces = GetConVarInt(g_hBounces);
-	g_iRandom = GetConVarInt(g_hRandom);
-	g_iRandomMax = GetConVarInt(g_hRandomMax);
-	g_iRandomMin = GetConVarInt(g_hRandomMin);
-	g_bRoundStartAd = GetConVarBool(g_hRoundStartAdvert);
-	g_iClientHealth = GetConVarInt(g_hClientHealth);
-	g_iClientArmor = GetConVarInt(g_hClientArmor);
-	g_fDBDamage = GetConVarFloat(g_hDBDamage);
-	g_bDebug = GetConVarBool(g_hDebug);
-	g_bCustomHitReg = GetConVarBool(g_hCustomHitReg);
-	g_bMinigames = GetConVarBool(g_hMinigamesMode);
-	g_bAutoMode = GetConVarBool(g_hAutoMode);
+	fGiveTime = GetConVarFloat(g_hGiveTime);
+	bPrint = GetConVarBool(g_hPrint);
+	fRemoveTimer = GetConVarFloat(g_hRemovetimer);
+	iBounces = GetConVarInt(g_hBounces);
+	iRandom = GetConVarInt(g_hRandom);
+	iRandomMax = GetConVarInt(g_hRandomMax);
+	iRandomMin = GetConVarInt(g_hRandomMin);
+	bRoundStartAd = GetConVarBool(g_hRoundStartAdvert);
+	iClientHealth = GetConVarInt(g_hClientHealth);
+	iClientArmor = GetConVarInt(g_hClientArmor);
+	fDBDamage = GetConVarFloat(g_hDBDamage);
+	bDebug = GetConVarBool(g_hDebug);
+	bCustomHitReg = GetConVarBool(g_hCustomHitReg);
+	bMinigames = GetConVarBool(g_hMinigamesMode);
 	
-	if (g_bMinigames) {
+	if (bMinigames) {
 		// Set the flags of the FindConVars.
-		SetConVarFlags(g_hGravity, GetConVarFlags(g_hGravity)&~FCVAR_NOTIFY);
-		SetConVarFlags(g_hFriction, GetConVarFlags(g_hFriction)&~FCVAR_NOTIFY);
-		SetConVarFlags(g_hTimeScale, (GetConVarFlags(g_hTimeScale) & ~(FCVAR_NOTIFY|FCVAR_CHEAT)));
-		SetConVarFlags(g_hTimeScale, GetConVarFlags(g_hTimeScale)&FCVAR_REPLICATED);
-		SetConVarFlags(g_hAccelerate, GetConVarFlags(g_hAccelerate)&~FCVAR_NOTIFY);
+		SetConVarFlags(g_hfGravity, GetConVarFlags(g_hfGravity)&~FCVAR_NOTIFY);
+		SetConVarFlags(g_hfFriction, GetConVarFlags(g_hfFriction)&~FCVAR_NOTIFY);
+		SetConVarFlags(g_hfTimeScale, (GetConVarFlags(g_hfTimeScale) & ~(FCVAR_NOTIFY|FCVAR_CHEAT)));
+		SetConVarFlags(g_hfTimeScale, GetConVarFlags(g_hfTimeScale)&FCVAR_REPLICATED);
+		SetConVarFlags(g_hfAccelerate, GetConVarFlags(g_hfAccelerate)&~FCVAR_NOTIFY);
 	}
 	
-	CreateTimer(g_fRemoveTimer, Timer_RemoveDecoys, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	CreateTimer(fRemoveTimer, Timer_RemoveDecoys, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public Action:Timer_RemoveDecoys(Handle:timer, any:data)
@@ -225,20 +200,20 @@ public Action:Timer_RemoveDecoys(Handle:timer, any:data)
 	RemoveDecoys();
 }
 
-public OnClientPutInServer(iClient) {
-	SDKHook(iClient, SDKHook_WeaponSwitch, OnWeaponSwitch);
-	SDKHook(iClient, SDKHook_OnTakeDamage, OnTakeDamage);
+public OnClientPutInServer(client) {
+	SDKHook(client, SDKHook_WeaponSwitch, OnWeaponSwitch);
+	SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage);
 }
 
-public OnClientDisconnect(iClient) {
-	// Reset g_iBouncesRandClient for saftey reasons.
-	g_iBouncesRandClient[iClient] = 0;
+public OnClientDisconnect(client) {
+	// Reset iBouncesRandClient for saftey reasons.
+	iBouncesRandClient[client] = 0;
 }
 
-public Action:OnWeaponSwitch(iClient, iWeapon) {
+public Action:OnWeaponSwitch(client, weapon) {
 	// Block weapon switching.
     decl String:sWeapon[32];
-    GetEdictClassname(iWeapon, sWeapon, sizeof(sWeapon));
+    GetEdictClassname(weapon, sWeapon, sizeof(sWeapon));
     
     if(!StrEqual(sWeapon, "weapon_decoy"))
         return Plugin_Handled;
@@ -246,78 +221,78 @@ public Action:OnWeaponSwitch(iClient, iWeapon) {
     return Plugin_Continue;
 }
 
-public Action:OnTakeDamage(iVictim, &iAttacker, &iInflictor, &Float:fDamage, &iDamageType) {
+public Action:OnTakeDamage(victim, &attacker, &inflictor, &Float:damage, &damagetype) {
 	decl String:sWeapon[32];
-	GetEdictClassname(iInflictor, sWeapon, sizeof(sWeapon));
+	GetEdictClassname(inflictor, sWeapon, sizeof(sWeapon));
 
 	if(StrEqual(sWeapon, "weapon_decoy") || StrEqual(sWeapon, "decoy_projectile")) {
 		// Set the damage of the decoy using the ConVar: "sm_db_damage"
-		if (g_bDebug) {
-			LogMessage("[DB Debug]%N is taking damage from a dodgeball! Damage: %f", iVictim, g_fDBDamage);
+		if (bDebug) {
+			LogMessage("[DB Debug]%N is taking damage from a dodgeball! Damage: %f", victim, fDBDamage);
 		}
 		
-		fDamage = g_fDBDamage;
+		damage = fDBDamage;
 		return Plugin_Changed;
 	}
 
 	return Plugin_Continue;
 }
 
-public Event_PlayerSpawn(Handle:hEvent, const String:sName[], bool:bDontBroadcast) {
-	new iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+public Event_PlayerSpawn(Handle:event, const String:name[], bool:dontBroadcast) {
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	
 	// Remove all player weapons.
-	RemoveClientWeapons(iClient);
+	RemoveClientWeapons(client);
 	
-	// Give the iClient a decoy at spawn.
-	RequestFrame(GiveDecoy, iClient);
+	// Give the client a decoy at spawn.
+	RequestFrame(GiveDecoy, client);
 	
-	// Set the iClient's health and armor depending on the ConVars.
-	SetEntityHealth(iClient, g_iClientHealth);
-	SetEntProp(iClient, Prop_Send, "m_ArmorValue", g_iClientArmor);
+	// Set the client's health and armor depending on the ConVars.
+	SetEntityHealth(client, iClientHealth);
+	SetEntProp(client, Prop_Send, "m_ArmorValue", iClientArmor);
 	
 	// Random Bounces Per Player (mode 2 for sm_db_random)
-	if (g_iRandom == 2) {
-		g_iBouncesRandClient[iClient] = GetRandomInt(g_iRandomMin, g_iRandomMax);
+	if (iRandom == 2) {
+		iBouncesRandClient[client] = GetRandomInt(iRandomMin, iRandomMax);
 		
 		// Check
-		if (g_iBouncesRandClient[iClient] < 1) {
-			g_iBouncesRandClient[iClient] = 1;
+		if (iBouncesRandClient[client] < 1) {
+			iBouncesRandClient[client] = 1;
 		}
-		if (g_bDebug) {
-			LogMessage("[DB Debug]g_iRandom is two. %N has the bounce count of %i", iClient, g_iBouncesRandClient[iClient]);
+		if (bDebug) {
+			LogMessage("[DB Debug]iRandom is two. %N has the bounce count of %i", client, iBouncesRandClient[client]);
 		}
 	}
 }
 
-public Event_PlayerDeath(Handle:hEvent, const String:sName[], bool:bDontBroadcast) {
+public Event_PlayerDeath(Handle:event, const String:name[], bool:dontBroadcast) {
 	RemoveDecoys();
 }
 
-public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast) {
-	if (g_bRoundStartAd) {
+public Event_RoundStart(Handle:event, const String:name[], bool:dontBroadcast) {
+	if (bRoundStartAd) {
 		for (new i = 1; i <= MaxClients; i++) {
 			if (IsClientInGame(i) && !IsFakeClient(i)) {
-				PrintToChat(i, "\x02[DB]\x03 Decoy Dodgeball plugin made by Christian Deacon (download at \x02AlliedMods.net\x03).");
+				PrintToChat(i, "\x02[DB]\x03 Decoy Dodgeball plugin made by [GFL] Roy (download at \x02GFLClan.com\x03).");
 			}
 		}
 	}
 	
-	if (g_iRandom == 1) {
+	if (iRandom == 1) {
 		// Mode one.
-		g_iBouncesRand = GetRandomInt(g_iRandomMin, g_iRandomMax);
+		iBouncesRand = GetRandomInt(iRandomMin, iRandomMax);
 		
-		if (g_bDebug) {
-			LogMessage("[DB Debug]g_iRandom is one. Bounce count is %i for this round.", g_iBouncesRand);
+		if (bDebug) {
+			LogMessage("[DB Debug]iRandom is one. Bounce count is %i for this round.", iBouncesRand);
 		}
 	}
 	
-	if (g_bMinigames) {
+	if (bMinigames) {
 		// Minigames mode is enabled. Honestly, this is my first time working with Key Values in SourcePawn.
-		new Handle:hKV = CreateKeyValues("Minigames");
-		decl String:sFilePath[255];
-		BuildPath(Path_SM, sFilePath, sizeof(sFilePath), "configs/dodgeball_minigames.cfg");
-		FileToKeyValues(hKV, sFilePath);
+		new Handle:kv = CreateKeyValues("Minigames");
+		decl String:filepath[255];
+		BuildPath(Path_SM, filepath, sizeof(filepath), "configs/dodgeball_minigames.cfg");
+		FileToKeyValues(kv, filepath);
 		
 		// To get the random minigame.
 		new iMaxMinigames = 0;
@@ -328,57 +303,57 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 		// Factors for each minigame.
 		new Float:fGravity, Float:fFriction, Float:fTimeScale, Float:fAccelerate, String:sRSCC[MAX_NAME_LENGTH], String:sRECC[MAX_NAME_LENGTH], String:skName[MAX_NAME_LENGTH], iAnnounce, iDefault;
 		
-		if (KvGotoFirstSubKey(hKV)) {
+		if (KvGotoFirstSubKey(kv)) {
 			do {
 				iMaxMinigames++;
-				decl String:sBuffer[255];
-				KvGetSectionName(hKV, sBuffer, sizeof(sBuffer));
-				PushArrayString(hMinigameNames, sBuffer);
+				decl String:buffer[255];
+				KvGetSectionName(kv, buffer, sizeof(buffer));
+				PushArrayString(hMinigameNames, buffer);
 				
-			} while (KvGotoNextKey(hKV));		
-			KvRewind(hKV);
-			KvGotoFirstSubKey(hKV)
+			} while (KvGotoNextKey(kv));		
+			KvRewind(kv);
+			KvGotoFirstSubKey(kv)
 			
 			// Now pick a random minigame.
 			iMinigame = GetRandomInt(1, iMaxMinigames);
-			if (g_bDebug) {
+			if (bDebug) {
 				LogMessage("[DB Debug]Minigames: 1-%i", iMaxMinigames);
 			}
 			
-			new String:sKeyName[255];
-			GetArrayString(hMinigameNames, iMinigame - 1, sKeyName, sizeof(sKeyName));
+			new String:keyname[255];
+			GetArrayString(hMinigameNames, iMinigame - 1, keyname, sizeof(keyname));
 			
-			decl String:sBuffer[255];
+			decl String:buffer[255];
 			do {
-				KvGetSectionName(hKV, sBuffer, sizeof(sBuffer));
-				if (g_bDebug) {
-					LogMessage("[DB Debug]Going through Minigame: \"%s\"... \"%s\" is the selected Minigame.", sBuffer, sKeyName);
+				KvGetSectionName(kv, buffer, sizeof(buffer));
+				if (bDebug) {
+					LogMessage("[DB Debug]Going through Minigame: \"%s\"... \"%s\" is the selected Minigame.", buffer, keyname);
 				}
-				if (StrEqual(sBuffer, sKeyName)) {
-					if (g_bDebug) {
-						LogMessage("[DB Debug]\"%s\" minigame selected...", sBuffer);
+				if (StrEqual(buffer, keyname)) {
+					if (bDebug) {
+						LogMessage("[DB Debug]\"%s\" minigame selected...", buffer);
 					}
-					KvGetString(hKV, "name", skName, sizeof(skName));
-					fGravity = KvGetFloat(hKV, "gravity");
-					fFriction = KvGetFloat(hKV, "friction");
-					fTimeScale = KvGetFloat(hKV, "timescale");
-					fAccelerate = KvGetFloat(hKV, "accelerate");
-					iAnnounce = KvGetNum(hKV, "announce");
-					iDefault = KvGetNum(hKV, "default");
-					KvGetString(hKV, "rscc", sRSCC, sizeof(sRSCC));
-					KvGetString(hKV, "recc", sRECC, sizeof(sRECC));
+					KvGetString(kv, "name", skName, sizeof(skName));
+					fGravity = KvGetFloat(kv, "gravity");
+					fFriction = KvGetFloat(kv, "friction");
+					fTimeScale = KvGetFloat(kv, "timescale");
+					fAccelerate = KvGetFloat(kv, "accelerate");
+					iAnnounce = KvGetNum(kv, "announce");
+					iDefault = KvGetNum(kv, "default");
+					KvGetString(kv, "rscc", sRSCC, sizeof(sRSCC));
+					KvGetString(kv, "recc", sRECC, sizeof(sRECC));
 				}
-			} while (KvGotoNextKey(hKV));
+			} while (KvGotoNextKey(kv));
 			// Now let's setup the game!
-			if (!StrEqual(skName, "")) {
-				SetConVarFloat(g_hGravity, fGravity);
-				SetConVarFloat(g_hFriction, fFriction);
+			if (!StrEqual(name, "")) {
+				SetConVarFloat(g_hfGravity, fGravity);
+				SetConVarFloat(g_hfFriction, fFriction);
 				if (iDefault || fTimeScale == 1.0) {
 					SetTimeScale(fTimeScale, true);
 				} else {
 					SetTimeScale(fTimeScale, false);
 				}
-				SetConVarFloat(g_hAccelerate, fAccelerate);
+				SetConVarFloat(g_hfAccelerate, fAccelerate);
 				if (!StrEqual(sRSCC, "")) {
 					ServerCommand("exec %s", sRSCC);
 				}
@@ -387,203 +362,203 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 				}
 				
 				// Do the round end custom config
-				strcopy(g_sRECC2, sizeof(g_sRECC2), sRECC);
+				strcopy(sRECC2, sizeof(sRECC2), sRECC);
 			}
 		}
-		CloseHandle(hKV);
+		CloseHandle(kv);
 		CloseHandle(hMinigameNames);
 	}
 }
 
-public Event_RoundEnd(Handle:hEvent, const String:sName[], bool:bDontBroadcast) {
+public Event_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast) {
 	// Set all the factors back to default if Minigames is enabled.
-	if (g_bMinigames) {
-		SetConVarFloat(g_hGravity, 800.0);
-		SetConVarFloat(g_hFriction, 5.2);
-		SetConVarFloat(g_hAccelerate, 5.5);
+	if (bMinigames) {
+		SetConVarFloat(g_hfGravity, 800.0);
+		SetConVarFloat(g_hfFriction, 5.2);
+		SetConVarFloat(g_hfAccelerate, 5.5);
 		SetTimeScale(1.0, true);
 		
-		if (!StrEqual(g_sRECC2, "")) {
-			ServerCommand("exec %s", g_sRECC2);
+		if (!StrEqual(sRECC2, "")) {
+			ServerCommand("exec %s", sRECC2);
 		}
 	}
 }
 
-public OnEntityCreated(iEntity, const String:sClassName[]) {
-	if (StrEqual(sClassName, "decoy_projectile", false)) {
-		SDKHook(iEntity, SDKHook_Spawn, OnEntitySpawned);
-		SDKHook(iEntity, SDKHook_StartTouch, OnEntityTouch);
+public OnEntityCreated(entity, const String:classname[]) {
+	if (StrEqual(classname, "decoy_projectile", false)) {
+		SDKHook(entity, SDKHook_Spawn, OnEntitySpawned);
+		SDKHook(entity, SDKHook_StartTouch, OnEntityTouch);
 	}
 }
 
-public OnEntitySpawned(iEntity) {
-	new iClient = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+public OnEntitySpawned(entity) {
+	new client = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 	
 	// Remove all player weapons.
-	RemoveClientWeapons(iClient);
+	RemoveClientWeapons(client);
 	
-	// Give the iClient a decoy on the next frame.
-	RequestFrame(GiveDecoy2, iClient);
+	// Give the client a decoy on the next frame.
+	RequestFrame(GiveDecoy2, client);
 }
 
-public OnEntityTouch(iEntity, itEntity) {
-	new owner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+public OnEntityTouch(entity, tentity) {
+	new owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 	if (owner > MaxClients || owner < 1) {
 		// Not a valid owner...
-		if (g_bDebug) {
+		if (bDebug) {
 			LogMessage("[DB Debug]OnEntityTouch reported the owner isn't valid. %i is the owner index.", owner);
 		}
 		return;
 	}
 	
-	if (0 < itEntity < MaxClients) {
+	if (0 < tentity < MaxClients) {
 		// This is a player.
 		// Let's do the custom hits.
-		if(GetClientTeam(itEntity) != GetClientTeam(owner) && GetClientTeam(itEntity) > 1 && g_bCustomHitReg) {
+		if(GetClientTeam(tentity) != GetClientTeam(owner) && GetClientTeam(tentity) > 1 && bCustomHitReg) {
 			// Not on the same team.
-			new curhp = GetClientHealth(itEntity);
-			new newhp = curhp - RoundFloat(g_fDBDamage);
+			new curhp = GetClientHealth(tentity);
+			new newhp = curhp - RoundFloat(fDBDamage);
 			if (newhp < 1) {
-				ForcePlayerSuicide(itEntity);
+				ForcePlayerSuicide(tentity);
 			} else {
-				SetEntityHealth(itEntity, newhp);
+				SetEntityHealth(tentity, newhp);
 			}
 		}
 	} else {
-		g_iBounceCount[iEntity] += 1;
+		iBounceCount[entity] += 1;
 		
-		if (!g_iRandom) {
-			if (g_bDebug) {
-				LogMessage("[DB Debug]g_iRandom isn't enabled.");
+		if (!iRandom) {
+			if (bDebug) {
+				LogMessage("[DB Debug]iRandom isn't enabled.");
 			}
 			// Random mode is off, continue with the default setup.
-			if (g_iBounceCount[iEntity] >= g_iBounces) {
-				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom isn't enabled. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBounces);
+			if (iBounceCount[entity] >= iBounces) {
+				if (bDebug) {
+					LogMessage("[DB Debug]iRandom isn't enabled. Bounces exceeded. %i/%i", iBounceCount[entity], iBounces);
 				}
-				KillDodgeball(iEntity);
+				KillDodgeball(entity);
 			}
-		} else if (g_iRandom == 1) {
+		} else if (iRandom == 1) {
 			// Mode one.
-			if (g_bDebug) {
-				LogMessage("[DB Debug]g_iRandom is set to mode one.");
+			if (bDebug) {
+				LogMessage("[DB Debug]iRandom is set to mode one.");
 			}
 			
-			if (g_iBounceCount[iEntity] >= g_iBouncesRand) {
-				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom is set to mode one. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRand);
+			if (iBounceCount[entity] >= iBouncesRand) {
+				if (bDebug) {
+					LogMessage("[DB Debug]iRandom is set to mode one. Bounces exceeded. %i/%i", iBounceCount[entity], iBouncesRand);
 				}
-				KillDodgeball(iEntity);
+				KillDodgeball(entity);
 			}
-		} else if (g_iRandom == 2) {
+		} else if (iRandom == 2) {
 			// Mode two.
-			if (g_bDebug) {
-				LogMessage("[DB Debug]g_iRandom is set to mode two.");
+			if (bDebug) {
+				LogMessage("[DB Debug]iRandom is set to mode two.");
 			}
 			
-			if (g_iBounceCount[iEntity] >= g_iBouncesRandClient[owner]) {
-				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom is set to mode two. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRandClient[owner]);
+			if (iBounceCount[entity] >= iBouncesRandClient[owner]) {
+				if (bDebug) {
+					LogMessage("[DB Debug]iRandom is set to mode two. Bounces exceeded. %i/%i", iBounceCount[entity], iBouncesRandClient[owner]);
 				}
-				KillDodgeball(iEntity);
+				KillDodgeball(entity);
 			}
-		} else if (g_iRandom == 3) {
+		} else if (iRandom == 3) {
 			// Mode three.
-			if (g_bDebug) {
-				LogMessage("[DB Debug]g_iRandom is set to mode three.");
+			if (bDebug) {
+				LogMessage("[DB Debug]iRandom is set to mode three.");
 			}
 			
-			if (g_iBounceCount[iEntity] >= g_iBouncesRandClient[owner]) {
-				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom is set to mode three. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRandClient[owner]);
+			if (iBounceCount[entity] >= iBouncesRandClient[owner]) {
+				if (bDebug) {
+					LogMessage("[DB Debug]iRandom is set to mode three. Bounces exceeded. %i/%i", iBounceCount[entity], iBouncesRandClient[owner]);
 				}
-				KillDodgeball(iEntity);
+				KillDodgeball(entity);
 			}
 		} else {
-			if (g_bDebug) {
-				LogMessage("[DB Debug]g_iRandom isn't recognized. g_iRandom isn't enabled.");
+			if (bDebug) {
+				LogMessage("[DB Debug]iRandom isn't recognized. iRandom isn't enabled.");
 			}
 			// Random mode isn't recognized, setting to the default setup.
-			if (g_iBounceCount[iEntity] >= g_iBounces) {
-				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom isn't recognized. g_iRandom isn't enabled. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBounces);
+			if (iBounceCount[entity] >= iBounces) {
+				if (bDebug) {
+					LogMessage("[DB Debug]iRandom isn't recognized. iRandom isn't enabled. Bounces exceeded. %i/%i", iBounceCount[entity], iBounces);
 				}
-				KillDodgeball(iEntity);
+				KillDodgeball(entity);
 			}
 		}
 	}
 }
 
-public GiveDecoy(any:iClient) {
-	if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
-		GiveDodgeball(iClient);
+public GiveDecoy(any:client) {
+	if (IsClientInGame(client) && IsPlayerAlive(client)) {
+		GiveDodgeball(client);
 	}
 	
-	if (g_bPrint) {
-		PrintToChat(iClient, "\x02[DB]\x03 Decoy equipped! Go play some dodgeball!");
+	if (bPrint) {
+		PrintToChat(client, "\x02[DB]\x03 Decoy equipped! Go play some dodgeball!");
 	}
 }
 
-public GiveDecoy2(any:iClient) {
-	if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
+public GiveDecoy2(any:client) {
+	if (IsClientInGame(client) && IsPlayerAlive(client)) {
 		// Delay giving dodgeballs so it isn't spamming dodgeballs...
-		CreateTimer(g_fGiveTime, GiveDecoy2Timer, iClient);
+		CreateTimer(fGiveTime, GiveDecoy2Timer, client);
 	}
 }
 
-public Action:GiveDecoy2Timer(Handle:hTimer, any:iClient) {
-	if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
-		new ent = GetPlayerWeaponSlot(iClient, CS_SLOT_GRENADE);
-		new String:sWepName[64];
+public Action:GiveDecoy2Timer(Handle:timer, any:client) {
+	if (IsClientInGame(client) && IsPlayerAlive(client)) {
+		new ent = GetPlayerWeaponSlot(client, CS_SLOT_GRENADE);
+		new String:weaponname[64];
 		if (ent != -1) {
-			GetEntityClassname(ent, sWepName, sizeof(sWepName));
+			GetEntityClassname(ent, weaponname, sizeof(weaponname));
 		}
 		
 		// Now to give the item again.
-		if (!StrEqual(sWepName, "weapon_decoy", false)) {
-			GiveDodgeball(iClient);
+		if (!StrEqual(weaponname, "weapon_decoy", false)) {
+			GiveDodgeball(client);
 		}
 	}
 }
 
 // Dodgeball specific functions (not sure whether to use public or stock).
-stock KillDodgeball(iEntity) {
-	if (g_bDebug) {
+stock KillDodgeball(entity) {
+	if (bDebug) {
 		LogMessage("[DB Debug]Attempting to kill the dodgeball.");
 	}
-	// Kill the iEntity.
-	AcceptEntityInput(iEntity, "kill");
+	// Kill the entity.
+	AcceptEntityInput(entity, "kill");
 	
-	// Reset the iEntity index bounce count.
-	g_iBounceCount[iEntity] = 0;
+	// Reset the entity index bounce count.
+	iBounceCount[entity] = 0;
 }
 
-stock GiveDodgeball(iClient) {
-	GivePlayerItem(iClient, "weapon_decoy");
+stock GiveDodgeball(client) {
+	GivePlayerItem(client, "weapon_decoy");
 	
-	if (g_iRandom == 3) {
-		g_iBouncesRandClient[iClient] = GetRandomInt(g_iRandomMin, g_iRandomMax);
+	if (iRandom == 3) {
+		iBouncesRandClient[client] = GetRandomInt(iRandomMin, iRandomMax);
 		
 		// Check
-		if (g_iBouncesRandClient[iClient] < 1) {
-			g_iBouncesRandClient[iClient] = 1;
+		if (iBouncesRandClient[client] < 1) {
+			iBouncesRandClient[client] = 1;
 		}
 	}
 }
 
-stock SetTimeScale(Float:fTS, bool:bReset) {
-	SetConVarFloat(g_hTimeScale, fTS);
+stock SetTimeScale(Float:ts, bool:reset) {
+	SetConVarFloat(g_hfTimeScale, ts);
 	
-	if (bReset) {
+	if (reset) {
 		UpdateClientCheats(0);
 	} else {
 		UpdateClientCheats(1);
 	}
 	
-	ServerCommand("host_timescale %f", fTS);
+	ServerCommand("host_timescale %f", ts);
 }
 
-stock UpdateClientCheats(const iValue) {
+stock UpdateClientCheats(const value) {
 	new Handle:cheats = FindConVar("sv_cheats");
 	if (cheats == INVALID_HANDLE) {
 		return;
@@ -592,26 +567,26 @@ stock UpdateClientCheats(const iValue) {
 	for (new i = 1; i <= MaxClients; i++) {
 		if (IsValidEdict(i) && IsClientConnected(i) && !IsFakeClient(i)) {
 			decl String:svalue[11];
-			IntToString(iValue, svalue, sizeof(svalue));
+			IntToString(value, svalue, sizeof(svalue));
 			SendConVarValue(i, cheats, svalue);
 		}
 	}
 }
 
-stock RemoveClientWeapons(iClient) {
+stock RemoveClientWeapons(client) {
 	for (new i=0; i <= 5; i++) {
-		new iEnt = -1;
-		iEnt = GetPlayerWeaponSlot(iClient, i);
-		if (iEnt != -1) {
-			RemovePlayerItem(iClient, iEnt);
-			RemoveEdict(iEnt);
+		new ent = -1;
+		ent = GetPlayerWeaponSlot(client, i);
+		if (ent != -1) {
+			RemovePlayerItem(client, ent);
+			RemoveEdict(ent);
 		}
 	}
 }
 
 stock RemoveDecoys() {
 	decl String:sClassName[64];
-	for(new i = MaxClients; i < GetMaxEntities(); i++)
+	for(new i = MaxClients; i< GetMaxEntities(); i++)
 	{
 		if(IsValidEntity(i) && IsValidEdict(i) && GetEdictClassname(i, sClassName, sizeof(sClassName)) && StrEqual(sClassName, "weapon_decoy") && GetEntPropEnt(i, Prop_Send, "m_hOwnerEntity") == -1) {
 			AcceptEntityInput(i, "kill");
