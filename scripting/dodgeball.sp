@@ -4,7 +4,7 @@
 #include <cstrike>
 
 #define MAXENTITIES 2048
-#define PL_VERSION "1.5"
+#define PL_VERSION "1.6"
 
 /*
 Versions:
@@ -52,6 +52,9 @@ Versions:
 	- Organized Code
 	- Renamed a few PrintToChat() strings.
 	- Added a ConVar: sm_db_automode - If 1, if the HP/Armor ConVar is changed, all current alive players will be set to the new values.
+1.6:
+	- Optimized code.
+	- Timers pass the client's serial instead of the index.
 */
 
 public Plugin:myinfo = {
@@ -315,7 +318,7 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 	if (g_bMinigames) {
 		// Minigames mode is enabled. Honestly, this is my first time working with Key Values in SourcePawn.
 		new Handle:hKV = CreateKeyValues("Minigames");
-		decl String:sFilePath[255];
+		decl String:sFilePath[256];
 		BuildPath(Path_SM, sFilePath, sizeof(sFilePath), "configs/dodgeball_minigames.cfg");
 		FileToKeyValues(hKV, sFilePath);
 		
@@ -326,12 +329,13 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 		new Handle:hMinigameNames = CreateArray(iBlockSize);
 		
 		// Factors for each minigame.
-		new Float:fGravity, Float:fFriction, Float:fTimeScale, Float:fAccelerate, String:sRSCC[MAX_NAME_LENGTH], String:sRECC[MAX_NAME_LENGTH], String:skName[MAX_NAME_LENGTH], iAnnounce, iDefault;
+		new Float:fGravity, Float:fFriction, Float:fTimeScale, Float:fAccelerate, iAnnounce, iDefault;
+		decl String:sRSCC[MAX_NAME_LENGTH], String:sRECC[MAX_NAME_LENGTH], String:skName[MAX_NAME_LENGTH];
 		
 		if (KvGotoFirstSubKey(hKV)) {
 			do {
 				iMaxMinigames++;
-				decl String:sBuffer[255];
+				decl String:sBuffer[256];
 				KvGetSectionName(hKV, sBuffer, sizeof(sBuffer));
 				PushArrayString(hMinigameNames, sBuffer);
 				
@@ -345,10 +349,9 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 				LogMessage("[DB Debug]Minigames: 1-%i", iMaxMinigames);
 			}
 			
-			new String:sKeyName[255];
+			decl String:sKeyName[256], String:sBuffer[256];
 			GetArrayString(hMinigameNames, iMinigame - 1, sKeyName, sizeof(sKeyName));
-			
-			decl String:sBuffer[255];
+		
 			do {
 				KvGetSectionName(hKV, sBuffer, sizeof(sBuffer));
 				if (g_bDebug) {
@@ -427,11 +430,11 @@ public OnEntitySpawned(iEntity) {
 }
 
 public OnEntityTouch(iEntity, itEntity) {
-	new owner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
-	if (owner > MaxClients || owner < 1) {
+	new iOwner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+	if (iOwner > MaxClients || iOwner < 1) {
 		// Not a valid owner...
 		if (g_bDebug) {
-			LogMessage("[DB Debug]OnEntityTouch reported the owner isn't valid. %i is the owner index.", owner);
+			LogMessage("[DB Debug]OnEntityTouch reported the owner isn't valid. %i is the owner index.", iOwner);
 		}
 		return;
 	}
@@ -439,7 +442,7 @@ public OnEntityTouch(iEntity, itEntity) {
 	if (0 < itEntity < MaxClients) {
 		// This is a player.
 		// Let's do the custom hits.
-		if(GetClientTeam(itEntity) != GetClientTeam(owner) && GetClientTeam(itEntity) > 1 && g_bCustomHitReg) {
+		if(GetClientTeam(itEntity) != GetClientTeam(iOwner) && GetClientTeam(itEntity) > 1 && g_bCustomHitReg) {
 			// Not on the same team.
 			new curhp = GetClientHealth(itEntity);
 			new newhp = curhp - RoundFloat(g_fDBDamage);
@@ -481,9 +484,9 @@ public OnEntityTouch(iEntity, itEntity) {
 				LogMessage("[DB Debug]g_iRandom is set to mode two.");
 			}
 			
-			if (g_iBounceCount[iEntity] >= g_iBouncesRandClient[owner]) {
+			if (g_iBounceCount[iEntity] >= g_iBouncesRandClient[iOwner]) {
 				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom is set to mode two. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRandClient[owner]);
+					LogMessage("[DB Debug]g_iRandom is set to mode two. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRandClient[iOwner]);
 				}
 				KillDodgeball(iEntity);
 			}
@@ -493,9 +496,9 @@ public OnEntityTouch(iEntity, itEntity) {
 				LogMessage("[DB Debug]g_iRandom is set to mode three.");
 			}
 			
-			if (g_iBounceCount[iEntity] >= g_iBouncesRandClient[owner]) {
+			if (g_iBounceCount[iEntity] >= g_iBouncesRandClient[iOwner]) {
 				if (g_bDebug) {
-					LogMessage("[DB Debug]g_iRandom is set to mode three. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRandClient[owner]);
+					LogMessage("[DB Debug]g_iRandom is set to mode three. Bounces exceeded. %i/%i", g_iBounceCount[iEntity], g_iBouncesRandClient[iOwner]);
 				}
 				KillDodgeball(iEntity);
 			}
@@ -527,14 +530,15 @@ public GiveDecoy(any:iClient) {
 public GiveDecoy2(any:iClient) {
 	if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
 		// Delay giving dodgeballs so it isn't spamming dodgeballs...
-		CreateTimer(g_fGiveTime, GiveDecoy2Timer, iClient);
+		CreateTimer(g_fGiveTime, GiveDecoy2Timer, GetClientUserId(iClient));
 	}
 }
 
-public Action:GiveDecoy2Timer(Handle:hTimer, any:iClient) {
+public Action:GiveDecoy2Timer(Handle:hTimer, any:iUserID) {
+	new iClient = GetClientOfUserId(iUserID);
 	if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
 		new ent = GetPlayerWeaponSlot(iClient, CS_SLOT_GRENADE);
-		new String:sWepName[64];
+		decl String:sWepName[64];
 		if (ent != -1) {
 			GetEntityClassname(ent, sWepName, sizeof(sWepName));
 		}
@@ -599,9 +603,9 @@ stock UpdateClientCheats(const iValue) {
 }
 
 stock RemoveClientWeapons(iClient) {
-	for (new i=0; i <= 5; i++) {
-		new iEnt = -1;
-		iEnt = GetPlayerWeaponSlot(iClient, i);
+	for (new i=0; i < 5; i++) {
+		new iEnt = GetPlayerWeaponSlot(iClient, i);
+		
 		if (iEnt != -1) {
 			RemovePlayerItem(iClient, iEnt);
 			RemoveEdict(iEnt);
