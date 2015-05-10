@@ -4,7 +4,7 @@
 #include <cstrike>
 
 #define MAXENTITIES 2048
-#define PL_VERSION "1.6"
+#define PL_VERSION "1.7"
 
 /*
 Versions:
@@ -55,6 +55,8 @@ Versions:
 1.6:
 	- Optimized code.
 	- Timers pass the client's serial instead of the index.
+1.7:
+	- Added safe-code.
 */
 
 public Plugin:myinfo = {
@@ -414,12 +416,12 @@ public Event_RoundEnd(Handle:hEvent, const String:sName[], bool:bDontBroadcast) 
 
 public OnEntityCreated(iEntity, const String:sClassName[]) {
 	if (StrEqual(sClassName, "decoy_projectile", false)) {
-		SDKHook(iEntity, SDKHook_Spawn, OnEntitySpawned);
-		SDKHook(iEntity, SDKHook_StartTouch, OnEntityTouch);
+		SDKHook(iEntity, SDKHook_Spawn, OnDecoySpawned);
+		SDKHook(iEntity, SDKHook_StartTouch, OnDecoyTouch);
 	}
 }
 
-public OnEntitySpawned(iEntity) {
+public OnDecoySpawned(iEntity) {
 	new iClient = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
 	
 	// Remove all player weapons.
@@ -429,12 +431,12 @@ public OnEntitySpawned(iEntity) {
 	RequestFrame(GiveDecoy2, iClient);
 }
 
-public OnEntityTouch(iEntity, itEntity) {
+public OnDecoyTouch(iEntity, itEntity) {
 	new iOwner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
 	if (iOwner > MaxClients || iOwner < 1) {
 		// Not a valid owner...
 		if (g_bDebug) {
-			LogMessage("[DB Debug]OnEntityTouch reported the owner isn't valid. %i is the owner index.", iOwner);
+			LogMessage("[DB Debug]OnDecoyTouch reported the owner isn't valid. %i is the owner index.", iOwner);
 		}
 		return;
 	}
@@ -536,6 +538,10 @@ public GiveDecoy2(any:iClient) {
 
 public Action:GiveDecoy2Timer(Handle:hTimer, any:iUserID) {
 	new iClient = GetClientOfUserId(iUserID);
+	if (!iClient) {
+		return Plugin_Stop;
+	}
+	
 	if (IsClientInGame(iClient) && IsPlayerAlive(iClient)) {
 		new ent = GetPlayerWeaponSlot(iClient, CS_SLOT_GRENADE);
 		decl String:sWepName[64];
@@ -548,6 +554,8 @@ public Action:GiveDecoy2Timer(Handle:hTimer, any:iUserID) {
 			GiveDodgeball(iClient);
 		}
 	}
+	
+	return Plugin_Stop;
 }
 
 // Dodgeball specific functions (not sure whether to use public or stock).
