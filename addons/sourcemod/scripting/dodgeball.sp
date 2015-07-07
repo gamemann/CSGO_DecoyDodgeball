@@ -326,7 +326,7 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 				
 			} while (KvGotoNextKey(hKV));		
 			KvRewind(hKV);
-			KvGotoFirstSubKey(hKV)
+			KvGotoFirstSubKey(hKV);
 			
 			iMinigame = GetRandomInt(1, iMaxMinigames);
 			if (g_bDebug) 
