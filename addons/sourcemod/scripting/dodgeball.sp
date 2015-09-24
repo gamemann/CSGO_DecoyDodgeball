@@ -4,7 +4,7 @@
 #include <cstrike>
 
 #define MAXENTITIES 2048
-#define PL_VERSION "1.9"
+#define PL_VERSION "2.0"
 
 public Plugin:myinfo = 
 {
@@ -32,6 +32,7 @@ new Handle:g_hMinigamesMode = INVALID_HANDLE;
 new Handle:g_hAutoMode = INVALID_HANDLE;
 new Handle:g_hLogFile = INVALID_HANDLE;
 new Handle:g_hEnabled = INVALID_HANDLE;
+new Handle:g_hGEnabled = INVALID_HANDLE;
 
 // ConVar Values
 new Float:g_fGiveTime;
@@ -50,6 +51,7 @@ new bool:g_bMinigames;
 new bool:g_bAutoMode;
 new String:g_sLogFile[PLATFORM_MAX_PATH];
 new bool:g_bEnabled;
+new bool:g_bGEnabled;
 
 // Other Values
 new g_iBounceCount[MAXENTITIES+1];
@@ -82,6 +84,7 @@ public OnPluginStart()
 	g_hAutoMode = CreateConVar("sm_db_automode", "1", "If 1, if the HP/Armor ConVar is changed, all current alive players will be set to the values.");
 	g_hLogFile = CreateConVar("sm_db_logfile", "logs/dodgeball.log", "The logging file starting from the SourceMod directory.");
 	g_hEnabled = CreateConVar("sm_db_enabled", "1", "Enables Decoy Dodgeball.");
+	g_hGEnabled = CreateConVar("sm_db_give_enabled", "1", "Enable/Disable the plugin giving decoys.");
 	
 	// AlliedMods Release.
 	CreateConVar("sm_db_version", PL_VERSION, "The current version of CS:GO Decoy Dodgeball.");
@@ -103,6 +106,7 @@ public OnPluginStart()
 	HookConVarChange(g_hAutoMode, CVarChanged);
 	HookConVarChange(g_hLogFile, CVarChanged);
 	HookConVarChange(g_hEnabled, CVarChanged);
+	HookConVarChange(g_hGEnabled, CVarChanged);
 	
 	// Auto execute the config!
 	AutoExecConfig(true, "plugin.dodgeball");
@@ -166,6 +170,7 @@ public OnConfigsExecuted()
 	g_bAutoMode = GetConVarBool(g_hAutoMode);
 	GetConVarString(g_hLogFile, g_sLogFile, sizeof(g_sLogFile));
 	g_bEnabled = GetConVarBool(g_hEnabled);
+	g_bGEnabled = GetConVarBool(g_hGEnabled);
 	
 	BuildPath(Path_SM, g_sLogFilePath, sizeof(g_sLogFilePath), g_sLogFile);
 	if (g_bEnabled)
@@ -642,7 +647,7 @@ stock KillDodgeball(iEntity)
 
 stock GiveDodgeball(iClient) 
 {
-	if (!g_bEnabled)
+	if (!g_bEnabled || !g_bGEnabled)
 	{
 		return;
 	}
