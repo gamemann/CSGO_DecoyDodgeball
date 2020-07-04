@@ -4,63 +4,68 @@
 #include <cstrike>
 
 #define MAXENTITIES 2048
-#define PL_VERSION "2.0"
+#define PL_VERSION "1.1"
 
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
-	name = "[CS:GO] Decoy Dodgeball",
-	description = "A Decoy Dodgeball plugin for Counter-Strike: Global Offensive.",
+	name = "[CS:GO] Decoy Dodgeball (Stable)",
 	author = "Roy (Christian Deacon)",
+	description = "A Decoy Dodgeball plugin for Counter-Strike: Global Offensive.",
 	version = PL_VERSION,
 	url = "GFLClan.com & TheDevelopingCommunity.com & Alliedmods.net"
 };
 
 // ConVars
-new Handle:g_hGiveTime = INVALID_HANDLE;
-new Handle:g_hPrint = INVALID_HANDLE;
-new Handle:g_hRemovetimer = INVALID_HANDLE;
-new Handle:g_hBounces = INVALID_HANDLE;
-new Handle:g_hRandom = INVALID_HANDLE;
-new Handle:g_hRandomMax = INVALID_HANDLE;
-new Handle:g_hRandomMin = INVALID_HANDLE;
-new Handle:g_hRoundStartAdvert = INVALID_HANDLE;
-new Handle:g_hClientHealth = INVALID_HANDLE;
-new Handle:g_hClientArmor = INVALID_HANDLE;
-new Handle:g_hDBDamage = INVALID_HANDLE;
-new Handle:g_hDebug = INVALID_HANDLE;
-new Handle:g_hMinigamesMode = INVALID_HANDLE;
-new Handle:g_hAutoMode = INVALID_HANDLE;
-new Handle:g_hLogFile = INVALID_HANDLE;
-new Handle:g_hEnabled = INVALID_HANDLE;
-new Handle:g_hGEnabled = INVALID_HANDLE;
+Handle g_hGiveTime = null;
+Handle g_hPrint = null;
+Handle g_hRemovetimer = null;
+Handle g_hBounces = null;
+Handle g_hRandom = null;
+Handle g_hRandomMax = null;
+Handle g_hRandomMin = null;
+Handle g_hRoundStartAdvert = null;
+Handle g_hClientHealth = null;
+Handle g_hClientArmor = null;
+Handle g_hDBDamage = null;
+Handle g_hDebug = null;
+Handle g_hMinigamesMode = null;
+Handle g_hAutoMode = null;
+Handle g_hLogFile = null;
+Handle g_hEnabled = null;
+Handle g_hGEnabled = null;
+Handle g_hBotThrow = null;
 
 // ConVar Values
-new Float:g_fGiveTime;
-new bool:g_bPrint;
-new Float:g_fRemoveTimer;
-new g_iBounces;
-new g_iRandom;
-new g_iRandomMax;
-new g_iRandomMin;
-new bool:g_bRoundStartAd;
-new g_iClientHealth;
-new g_iClientArmor;
-new Float:g_fDBDamage;
-new bool:g_bDebug;
-new bool:g_bMinigames;
-new bool:g_bAutoMode;
-new String:g_sLogFile[PLATFORM_MAX_PATH];
-new bool:g_bEnabled;
-new bool:g_bGEnabled;
+float g_fGiveTime;
+bool g_bPrint;
+float g_fRemoveTimer;
+int g_iBounces;
+int g_iRandom;
+int g_iRandomMax;
+int g_iRandomMin;
+bool g_bRoundStartAd;
+int g_iClientHealth;
+int g_iClientArmor;
+float g_fDBDamage;
+bool g_bDebug;
+bool g_bMinigames;
+bool g_bAutoMode;
+char g_sLogFile[PLATFORM_MAX_PATH];
+bool g_bEnabled;
+bool g_bGEnabled;
+bool g_bBotThrow;
 
 // Other Values
-new g_iBounceCount[MAXENTITIES+1];
-new g_iBouncesRand;	
-new g_iBouncesRandClient[MAXPLAYERS+1];
-new String:g_sRECC2[MAX_NAME_LENGTH];
-new String:g_sLogFilePath[PLATFORM_MAX_PATH];
+int g_iBounceCount[MAXENTITIES+1];
+int g_iBouncesRand;	
+int g_iBouncesRandClient[MAXPLAYERS+1];
+char g_sRECC2[MAX_NAME_LENGTH];
+char g_sLogFilePath[PLATFORM_MAX_PATH];
+bool g_bPlayerThrow[MAXPLAYERS+1];
+Handle g_hBotResetTimer = null;
+Handle g_hRemoveTimer = null;
 
-public OnPluginStart() 
+public void OnPluginStart() 
 {
 	// Events.
 	HookEvent("player_spawn", Event_PlayerSpawn);
@@ -85,6 +90,7 @@ public OnPluginStart()
 	g_hLogFile = CreateConVar("sm_db_logfile", "logs/dodgeball.log", "The logging file starting from the SourceMod directory.");
 	g_hEnabled = CreateConVar("sm_db_enabled", "1", "Enables Decoy Dodgeball.");
 	g_hGEnabled = CreateConVar("sm_db_give_enabled", "1", "Enable/Disable the plugin giving decoys.");
+	g_hBotThrow = CreateConVar("sm_db_bot_throw", "1", "Once a decoy is equipped to a bot, it will automatically trigger \"IN_ATTACK\" a couple seconds later.");
 	
 	// AlliedMods Release.
 	CreateConVar("sm_db_version", PL_VERSION, "The current version of CS:GO Decoy Dodgeball.");
@@ -107,12 +113,13 @@ public OnPluginStart()
 	HookConVarChange(g_hLogFile, CVarChanged);
 	HookConVarChange(g_hEnabled, CVarChanged);
 	HookConVarChange(g_hGEnabled, CVarChanged);
+	HookConVarChange(g_hBotThrow, CVarChanged);
 	
 	// Auto execute the config!
 	AutoExecConfig(true, "plugin.dodgeball");
 	
 	// Late Loading
-	for (new i = 1; i <= MaxClients; i++) 
+	for (int i = 1; i <= MaxClients; i++) 
 	{
 		if (IsClientInGame(i)) 
 		{
@@ -121,28 +128,27 @@ public OnPluginStart()
 	}
 }
 
-public CVarChanged(Handle:hCvar, const String:sOldv[], const String:sNewv[]) 
+public void CVarChanged(Handle hCvar, const char[] sOldv, const char[] sNewv) 
 {
 	OnConfigsExecuted();
 	
 	// Auto-Mode
 	if (g_bAutoMode) 
 	{
-		if (hCvar == g_hClientHealth) 
+		if (hCvar == g_hClientHealth || hCvar == g_hClientArmor) 
 		{
-			for (new i = 1; i <= MaxClients; i++) 
+			for (int i = 1; i <= MaxClients; i++) 
 			{
-				if (IsClientInGame(i) && IsPlayerAlive(i)) 
+				if (!IsClientInGame(i) || !IsPlayerAlive(i))
+				{
+					continue;
+				}
+				
+				if (hCvar == g_hClientHealth)
 				{
 					SetEntityHealth(i, StringToInt(sNewv));
 				}
-			}
-		} 
-		else if (hCvar == g_hClientArmor) 
-		{
-			for (new i = 1; i <= MaxClients; i++) 
-			{
-				if (IsClientInGame(i) && IsPlayerAlive(i)) 
+				else if (hCvar == g_hClientArmor)
 				{
 					SetEntProp(i, Prop_Send, "m_ArmorValue", StringToInt(sNewv));
 				}
@@ -151,7 +157,7 @@ public CVarChanged(Handle:hCvar, const String:sOldv[], const String:sNewv[])
 	}
 }
 
-public OnConfigsExecuted() 
+public void OnConfigsExecuted() 
 {
 	// Set all the convars!
 	g_fGiveTime = GetConVarFloat(g_hGiveTime);
@@ -171,15 +177,35 @@ public OnConfigsExecuted()
 	GetConVarString(g_hLogFile, g_sLogFile, sizeof(g_sLogFile));
 	g_bEnabled = GetConVarBool(g_hEnabled);
 	g_bGEnabled = GetConVarBool(g_hGEnabled);
+	g_bBotThrow = GetConVarBool(g_hBotThrow);
 	
 	BuildPath(Path_SM, g_sLogFilePath, sizeof(g_sLogFilePath), g_sLogFile);
+	
 	if (g_bEnabled)
-	{
-		CreateTimer(g_fRemoveTimer, Timer_RemoveGroundWeapons, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	{	
+		g_hRemoveTimer = CreateTimer(g_fRemoveTimer, Timer_RemoveGroundWeapons, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+		
+		if (g_bBotThrow)
+		{	
+			g_hBotResetTimer = CreateTimer(3.0, Timer_ResetBots, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+		}
 	}
 }
 
-public Action:Timer_RemoveGroundWeapons(Handle:hTimer, any:data)
+public void OnMapEnd()
+{
+	if (g_hRemoveTimer != null)
+	{
+		delete g_hRemoveTimer;
+	}
+	
+	if (g_hBotResetTimer != null)
+	{
+		delete g_hBotResetTimer;
+	}
+}
+
+public Action Timer_RemoveGroundWeapons(Handle hTimer, any data)
 {
 	if (g_bEnabled)
 	{
@@ -187,7 +213,25 @@ public Action:Timer_RemoveGroundWeapons(Handle:hTimer, any:data)
 	}
 }
 
-public OnClientPutInServer(iClient) 
+public Action Timer_ResetBots (Handle hTimer)
+{
+	if (!g_bBotThrow)
+	{
+		return Plugin_Stop;
+	}
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (IsClientInGame(i) && IsFakeClient(i))
+		{
+			g_bPlayerThrow[i] = true;
+		}
+	}
+	
+	return Plugin_Handled;
+}
+
+public void OnClientPutInServer(int iClient) 
 {
 	if (g_bEnabled)
 	{
@@ -196,17 +240,15 @@ public OnClientPutInServer(iClient)
 		SDKHook(iClient, SDKHook_WeaponCanUse, OnWeaponCanUse);
 		SDKHook(iClient, SDKHook_WeaponDrop, OnWeaponDrop);
 	}
-	
-
 }
 
-public OnClientDisconnect(iClient) 
+public void OnClientDisconnect(int iClient) 
 {
 	// Reset g_iBouncesRandClient for saftey reasons.
 	g_iBouncesRandClient[iClient] = 0;
 }
 
-public Action:OnWeaponSwitch(iClient, iWeapon) 
+public Action OnWeaponSwitch(int iClient, int iWeapon) 
 {
 	if (!g_bEnabled)
 	{
@@ -214,7 +256,7 @@ public Action:OnWeaponSwitch(iClient, iWeapon)
 	}
 	
 	// Block weapon switching.
-	decl String:sWeapon[32];
+	char sWeapon[32];
 	GetEdictClassname(iWeapon, sWeapon, sizeof(sWeapon));
     
 	if(!StrEqual(sWeapon, "weapon_decoy"))
@@ -225,14 +267,14 @@ public Action:OnWeaponSwitch(iClient, iWeapon)
 	return Plugin_Continue;
 }
 
-public Action:OnTakeDamage(iVictim, &iAttacker, &iInflictor, &Float:fDamage, &iDamageType) 
+public Action OnTakeDamage(int iVictim, int &iAttacker, int &iInflictor, float &fDamage, int &iDamageType) 
 {
 	if (!g_bEnabled)
 	{
 		return Plugin_Continue;
 	}
 	
-	decl String:sWeapon[32];
+	char sWeapon[32];
 	GetEdictClassname(iInflictor, sWeapon, sizeof(sWeapon));
 
 	if(StrEqual(sWeapon, "weapon_decoy") || StrEqual(sWeapon, "decoy_projectile")) 
@@ -249,15 +291,15 @@ public Action:OnTakeDamage(iVictim, &iAttacker, &iInflictor, &Float:fDamage, &iD
 	return Plugin_Continue;
 }
 
-public Action:OnWeaponCanUse(iClient, iWeapon)
+public Action OnWeaponCanUse(int iClient, int iWeapon)
 {
 	if (!g_bEnabled)
 	{
 		return Plugin_Continue;
 	}
 	
-	decl String:sClassName[MAX_NAME_LENGTH];
-	new iOwner = GetEntPropEnt(iWeapon, Prop_Send, "m_hOwnerEntity");
+	char sClassName[MAX_NAME_LENGTH];
+	int iOwner = GetEntPropEnt(iWeapon, Prop_Send, "m_hOwnerEntity");
 	GetEntityClassname(iWeapon, sClassName, sizeof(sClassName));
 	
 	if (!StrEqual(sClassName, "weapon_decoy", false) || iOwner > 0)
@@ -268,7 +310,7 @@ public Action:OnWeaponCanUse(iClient, iWeapon)
 	return Plugin_Continue;
 }
 
-public Action:OnWeaponDrop(iClient, iWeapon)
+public Action OnWeaponDrop(int iClient, int iWeapon)
 {
 	if (!g_bEnabled)
 	{
@@ -283,14 +325,14 @@ public Action:OnWeaponDrop(iClient, iWeapon)
 	return Plugin_Continue;
 }
 
-public Event_PlayerSpawn(Handle:hEvent, const String:sName[], bool:bDontBroadcast) 
+public Action Event_PlayerSpawn(Event eEvent, const char[] sName, bool bDontBroadcast) 
 {
 	if (!g_bEnabled)
 	{
 		return;
 	}
 	
-	new iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+	int iClient = GetClientOfUserId(GetEventInt(eEvent, "userid"));
 	
 	// Remove all player weapons.
 	RemoveClientWeapons(iClient);
@@ -319,7 +361,7 @@ public Event_PlayerSpawn(Handle:hEvent, const String:sName[], bool:bDontBroadcas
 	}
 }
 
-public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast) 
+public Action Event_RoundStart(Event eEvent, const char[] sName, bool bDontBroadcast) 
 {
 	if (!g_bEnabled)
 	{
@@ -330,7 +372,7 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 	
 	if (g_bRoundStartAd) 
 	{
-		for (new i = 1; i <= MaxClients; i++) 
+		for (int i = 1; i <= MaxClients; i++) 
 		{
 			if (!IsClientInGame(i) || IsFakeClient(i))
 			{
@@ -358,21 +400,27 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 	
 	if (g_bMinigames) 
 	{
-		new Handle:hKV = CreateKeyValues("Minigames");
-		decl String:sFilePath[256];
-		BuildPath(Path_SM, sFilePath, sizeof(sFilePath), "configs/dodgeball_minigames.cfg");
+		Handle hKV = CreateKeyValues("Minigames");
+		char sFilePath[256];
+		BuildPath(Path_SM, sFilePath, sizeof(sFilePath), "configs/dodgeball/minigames.cfg");
 		FileToKeyValues(hKV, sFilePath);
 		
-		new iMinigame = 1, iMaxMinigames = 0, iAnnounce;
-		new Handle:hMinigameNames = CreateArray(ByteCountToCells(PLATFORM_MAX_PATH));
-		decl String:sRSCC[MAX_NAME_LENGTH], String:sRECC[MAX_NAME_LENGTH], String:skName[MAX_NAME_LENGTH];
+		int iMinigame = 1; 
+		int iMaxMinigames = 0; 
+		int iAnnounce;
+		
+		Handle hMinigameNames = CreateArray(ByteCountToCells(PLATFORM_MAX_PATH));
+		
+		char sRSCC[MAX_NAME_LENGTH];
+		char sRECC[MAX_NAME_LENGTH];
+		char skName[MAX_NAME_LENGTH];
 		
 		if (KvGotoFirstSubKey(hKV)) 
 		{
 			do 
 			{
 				iMaxMinigames++;
-				decl String:sBuffer[256];
+				char sBuffer[256];
 				KvGetSectionName(hKV, sBuffer, sizeof(sBuffer));
 				PushArrayString(hMinigameNames, sBuffer);
 				
@@ -386,7 +434,7 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 				LogToFile(g_sLogFilePath, "[NOTE]Minigames: 1-%i", iMaxMinigames);
 			}
 			
-			decl String:sKeyName[256], String:sBuffer[256];
+			char sKeyName[256], sBuffer[256];
 			GetArrayString(hMinigameNames, iMinigame - 1, sKeyName, sizeof(sKeyName));
 		
 			do 
@@ -425,19 +473,19 @@ public Event_RoundStart(Handle:hEvent, const String:sName[], bool:bDontBroadcast
 			}
 		}
 		
-		if (hKV != INVALID_HANDLE)
+		if (hKV != null)
 		{
-			CloseHandle(hKV);
+			delete hKV;
 		}
 		
-		if (hMinigameNames != INVALID_HANDLE)
+		if (hMinigameNames != null)
 		{
-			CloseHandle(hMinigameNames);
+			delete hMinigameNames;
 		}
 	}
 }
 
-public Event_RoundEnd(Handle:hEvent, const String:sName[], bool:bDontBroadcast) 
+public Action Event_RoundEnd(Event eEvent, const char[] sName, bool bDontBroadcast) 
 {
 	// Set all the factors back to default if Minigames is enabled.
 	if (g_bMinigames) 
@@ -449,7 +497,7 @@ public Event_RoundEnd(Handle:hEvent, const String:sName[], bool:bDontBroadcast)
 	}
 }
 
-public OnEntityCreated(iEntity, const String:sClassName[]) 
+public void OnEntityCreated(int iEntity, const char[] sClassName) 
 {
 	if (StrEqual(sClassName, "decoy_projectile", false) && g_bEnabled) 
 	{
@@ -458,14 +506,14 @@ public OnEntityCreated(iEntity, const String:sClassName[])
 	}
 }
 
-public OnDecoySpawned(iEntity) 
+public void OnDecoySpawned(int iEntity) 
 {
 	if (!g_bEnabled)
 	{
 		return;
 	}
 	
-	new iClient = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+	int iClient = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
 	
 	if (!iClient || !IsClientInGame(iClient) || !IsPlayerAlive(iClient))
 	{
@@ -481,14 +529,14 @@ public OnDecoySpawned(iEntity)
 	CreateTimer(g_fGiveTime, GiveDecoy2Timer, GetClientUserId(iClient));
 }
 
-public OnDecoyTouch(iEntity, itEntity) 
+public void OnDecoyTouch(int iEntity, int itEntity) 
 {
 	if (!g_bEnabled)
 	{
 		return;
 	}
 	
-	new iOwner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+	int iOwner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
 	
 	if (iOwner > MaxClients || iOwner < 1) 
 	{
@@ -554,7 +602,7 @@ public OnDecoyTouch(iEntity, itEntity)
 	}
 }
 
-public GiveDecoy(any:iClient) 
+public void GiveDecoy(any iClient) 
 {
 	if (!g_bEnabled)
 	{
@@ -575,7 +623,7 @@ public GiveDecoy(any:iClient)
 	{
 		if (g_bDebug)
 		{
-			decl String:sClientName[MAX_NAME_LENGTH], String:sSteamID[32];
+			char sClientName[MAX_NAME_LENGTH], sSteamID[32];
 			GetClientName(iClient, sClientName, sizeof(sClientName));
 			GetClientAuthId(iClient, AuthId_Steam2, sSteamID, sizeof(sSteamID));
 			LogToFile(g_sLogFilePath, "[ERROR]GiveDecoy() function returned: Client is not alive. Client Name: %s -- Client Steam ID: %s", sClientName, sSteamID);
@@ -592,14 +640,14 @@ public GiveDecoy(any:iClient)
 	}
 }
 
-public Action:GiveDecoy2Timer(Handle:hTimer, any:iUserID) 
+public Action GiveDecoy2Timer(Handle hTimer, any iUserID) 
 {
 	if (!g_bEnabled)
 	{
 		return Plugin_Stop;
 	}
 	
-	new iClient = GetClientOfUserId(iUserID);
+	int iClient = GetClientOfUserId(iUserID);
 	
 	if (!iClient || !IsClientInGame(iClient) || !IsPlayerAlive(iClient)) 
 	{
@@ -621,7 +669,7 @@ public Action:GiveDecoy2Timer(Handle:hTimer, any:iUserID)
 }
 
 // Dodgeball specific functions (not sure whether to use public or stock).
-stock KillDodgeball(iEntity) 
+stock void KillDodgeball(int iEntity) 
 {
 	if (!g_bEnabled)
 	{
@@ -645,7 +693,7 @@ stock KillDodgeball(iEntity)
 	g_iBounceCount[iEntity] = 0;
 }
 
-stock GiveDodgeball(iClient) 
+stock void GiveDodgeball(int iClient) 
 {
 	if (!g_bEnabled || !g_bGEnabled)
 	{
@@ -663,18 +711,27 @@ stock GiveDodgeball(iClient)
 			g_iBouncesRandClient[iClient] = 1;
 		}
 	}
+	
+	/* Bot Throw. */
+	if (g_bBotThrow && IsFakeClient(iClient))
+	{
+		if (g_bDebug)
+		{
+			LogToFile(g_sLogFilePath, "[WARNING]Fake client and g_bBotThrow is on.");
+		}
+	}
 }
 
-stock RemoveClientWeapons(iClient) 
+stock void RemoveClientWeapons(int iClient) 
 {
 	if (!g_bEnabled)
 	{
 		return;
 	}
 	
-	for (new i=0; i < 5; i++) 
+	for (int i=0; i < 5; i++) 
 	{
-		new iEnt = GetPlayerWeaponSlot(iClient, i);
+		int iEnt = GetPlayerWeaponSlot(iClient, i);
 		
 		if (iEnt > 0) 
 		{
@@ -684,17 +741,17 @@ stock RemoveClientWeapons(iClient)
 	}
 }
 
-stock RemoveGroundWeapons()
+stock void RemoveGroundWeapons()
 {
 	if (!g_bEnabled)
 	{
 		return;
 	}
 	
-	decl String:sClassname[MAX_NAME_LENGTH];
-	new iOwner;
+	char sClassname[MAX_NAME_LENGTH];
+	int iOwner;
 	
-	for (new i = MaxClients; i <= MAXENTITIES; i++)
+	for (int i = MaxClients; i <= MAXENTITIES; i++)
 	{
 		if (!IsValidEntity(i) || !IsValidEdict(i))
 		{
@@ -721,14 +778,14 @@ stock RemoveGroundWeapons()
 }
 
 // Not currently used.
-stock RemoveDecoys() 
+stock void RemoveDecoys() 
 {
 	if (!g_bEnabled)
 	{
 		return;
 	}
 	
-	new iEnt = -1;
+	int iEnt = -1;
 	
 	while ((iEnt = FindEntityByClassname(iEnt, "weapon_decoy")) != INVALID_ENT_REFERENCE) 
 	{
@@ -737,4 +794,37 @@ stock RemoveDecoys()
 			AcceptEntityInput(iEnt, "kill");
 		}
 	}
+}
+
+public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVel[3], float fAngles[3], int &iWeapons)
+{
+	if (!g_bBotThrow)
+	{
+		PrintToServer("Bot Throw Not Enabled.");
+		return Plugin_Continue;
+	}
+	
+	if (g_bPlayerThrow[iClient] && IsFakeClient(iClient))
+	{
+		if (!(iButtons & IN_ATTACK))
+		{
+			iButtons |= IN_ATTACK;
+			RequestFrame(funcRemoveFlags, iButtons);
+		}
+		else
+		{
+			iButtons &= ~IN_ATTACK;
+		}
+		
+		g_bPlayerThrow[iClient] = false;
+		
+		return Plugin_Changed;
+	}
+	
+	return Plugin_Continue;
+}
+
+public void funcRemoveFlags(int iButtons)
+{
+	iButtons &= ~IN_ATTACK;
 }
