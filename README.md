@@ -1,11 +1,7 @@
-# Description
-A popular Decoy Dodgeball plugin for Counter-Strike: Global Offensive.
+# CS:GO DodgeBall
+## Description
+A popular CS:GO DodgeBall plugin made in 2015.
 
-# Popular Servers
-* 72.5.195.223:27015 (GFL - Games For Life)
+## Credits
+* [Christian Deacon](https://www.linkedin.com/in/christian-deacon-902042186/) - Creator.
 
-# To-Do List
-https://trello.com/b/Z2EMUwXr/cs-go-decoy-dodgeball
-
-# WARNING!
-* You can find the latest version of this plugin on [GitLab] (https://lab.gflclan.com/gamemann/CSGO_DodgeBall)!
