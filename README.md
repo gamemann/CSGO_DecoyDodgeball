@@ -5,6 +5,7 @@ This mod continuously equips decoys to players after throwing and sets a player'
 ## Installation
 1. Compile `addons/sourcemod/scripting/dodgeball.sp` with SourceMod which will create a `.smx` file.
 1. Copy or move the `.smx` file into the `addons/sourcemod/plugins/` directory.
+1. Copy or move the `addons/sourcemod/configs/` and `addons/cfg/` directories to the game's main directory (`csgo/`).
 
 ## Configuration
 When loading the plugin, a configuration file should be created automatically at `csgo/cfg/sourcemod/plugin.dodgeball.cfg`. You may configure the mod there and also change those commands in the server's console if you don't want to wait until a map/server reload!
