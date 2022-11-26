@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "options": 
+    {
+        "env": 
+        {
+            "sm_path": "/home/dev/sm-10",
+            "server_path": "/home/christian/test-servers/css/cstrike/addons/sourcemod/plugins"
+        }
+    },
+    "tasks": 
+    [
+        {
+            "label": "sourcepawn",
+            "type": "shell",
+            "command": "$sm_path/spcomp64 ${file} -D ${workspaceFolder}/build -i ${workspaceFolder}/addons/sourcemod/scripting/include && sudo cp -f ${workspaceFolder}/build/${fileBasenameNoExtension}.smx ${server_path}",
+            "problemMatcher": []
+        }
+    ]
+}
