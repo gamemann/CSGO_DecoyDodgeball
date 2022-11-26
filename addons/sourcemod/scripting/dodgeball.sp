@@ -16,24 +16,24 @@ public Plugin myinfo =
 };
 
 // ConVars
-Handle g_hGiveTime = null;
-Handle g_hPrint = null;
-Handle g_hRemovetimer = null;
-Handle g_hBounces = null;
-Handle g_hRandom = null;
-Handle g_hRandomMax = null;
-Handle g_hRandomMin = null;
-Handle g_hRoundStartAdvert = null;
-Handle g_hClientHealth = null;
-Handle g_hClientArmor = null;
-Handle g_hDBDamage = null;
-Handle g_hDebug = null;
-Handle g_hMinigamesMode = null;
-Handle g_hAutoMode = null;
-Handle g_hLogFile = null;
-Handle g_hEnabled = null;
-Handle g_hGEnabled = null;
-Handle g_hBotThrow = null;
+ConVar g_hGiveTime = null;
+ConVar g_hPrint = null;
+ConVar g_hRemovetimer = null;
+ConVar g_hBounces = null;
+ConVar g_hRandom = null;
+ConVar g_hRandomMax = null;
+ConVar g_hRandomMin = null;
+ConVar g_hRoundStartAdvert = null;
+ConVar g_hClientHealth = null;
+ConVar g_hClientArmor = null;
+ConVar g_hDBDamage = null;
+ConVar g_hDebug = null;
+ConVar g_hMinigamesMode = null;
+ConVar g_hAutoMode = null;
+ConVar g_hLogFile = null;
+ConVar g_hEnabled = null;
+ConVar g_hGEnabled = null;
+ConVar g_hBotThrow = null;
 
 // ConVar Values
 float g_fGiveTime;
